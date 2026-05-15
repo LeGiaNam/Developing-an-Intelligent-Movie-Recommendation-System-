@@ -1,50 +1,56 @@
-/.codex
-FE/node_modules/
-FE/.next/
-/dist
-/node_modules
-/.vscode
-/.idea
-/.DS_Store
+# Local Codex / editor state
+.codex/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+!.env.example
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
+pnpm-debug.log*
 
-# Diagnostics
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-coverage   
-.nyc_output
-# Dependency directories
-/node_modules
-/bower_components
-# Optional npm cache directory
-.npm
-# Optional eslint cache
+# Node.js dependencies and build artifacts
+node_modules/
+**/node_modules/
+.npm/
 .eslintcache
-# Optional REPL history
-.node_repl_history
-# Output of 'npm pack'
-*.tgz
-# Yarn Integrity file
-.yarn-integrity
-# dotenv environment variables file
-.env
-.env.test
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-# Next.js build output
-.next
-# Nuxt.js build / generate output
-.nuxt
-/dist
-# Gatsby files
-.cache/
-public
-# vuepress build output
-.vuepress/dist
-# Serverless directories
+.next/
+**/.next/
+dist/
+**/dist/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Python artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# OS / temporary files
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# Docker / local runtime data
+mongo_data/
+redis_data/
+
