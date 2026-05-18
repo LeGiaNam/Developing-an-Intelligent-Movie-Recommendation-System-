@@ -1,0 +1,45 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: ipanmovie-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: ipanmovie-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  api:
+    build: ./apps/api
+    container_name: ipanmovie-api
+    env_file:
+      - ./apps/api/.env.example
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/ipanmovie
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:8001
+    ports:
+      - "4000:4000"
+    depends_on:
+      - mongo
+      - recommendation-service
+
+  recommendation-service:
+    build: ./apps/recommendation-service
+    container_name: ipanmovie-rs
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      RECOMMENDATION_CACHE_TTL_SECONDS: 300
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis
+
+volumes:
+  mongo_data:
+  redis_data:
