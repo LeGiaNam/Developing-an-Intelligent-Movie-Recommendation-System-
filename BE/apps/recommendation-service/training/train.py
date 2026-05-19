@@ -18,6 +18,8 @@ Sau khi train xong, thư mục models/ sẽ có:
 import pickle
 import sys
 import time
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
@@ -32,6 +34,9 @@ from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
 # Thêm thư mục gốc project vào sys.path để import được module app
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from training.preprocess import load_data, merge_data, build_features
 
@@ -50,6 +55,7 @@ except ImportError:
 
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
+ID_MAP_SOURCE = DATA_DIR / "id_map.json"
 
 
 def train_random_forest(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestRegressor:
@@ -211,8 +217,25 @@ def main():
     }
 
     # Chỉ lưu các cột cần thiết từ movies_df
-    movies_to_save = movies_df[["movieId", "title", "genres"]].drop_duplicates()
+    movie_columns = [column for column in ["movieId", "mongoMovieId", "title", "genres"] if column in movies_df.columns]
+    movies_to_save = movies_df[movie_columns].drop_duplicates()
     save_models(svd, rf, encoders, movies_to_save, ratings_df)
+    if ID_MAP_SOURCE.exists():
+        (MODEL_DIR / "id_map.json").write_text(ID_MAP_SOURCE.read_text(encoding="utf-8"), encoding="utf-8")
+        print("  ✅ Lưu id_map.json")
+    manifest = {
+        "model_version": f"hybrid-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+        "algorithm": "svd_random_forest_hybrid",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "source": "csv_training_pipeline",
+        "dataset": {
+            "movies": int(len(movies_df)),
+            "ratings": int(len(ratings_df)),
+        },
+        "serving_strategy": "online_model_inference_with_redis_cache",
+    }
+    (MODEL_DIR / "model_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    print("  ✅ Lưu model_manifest.json")
 
     elapsed = time.time() - start
     print(f"\n{'=' * 60}")

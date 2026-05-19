@@ -5,26 +5,33 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { api, fallback, mapProfile } from "@/lib/api";
+import { api, getCachedProfiles, loadProfiles, mapProfile } from "@/lib/api";
 import { clearToken, getToken, saveActiveProfileId } from "@/lib/auth";
 
 export default function ProfilesPage() {
   const router = useRouter();
-  const [profiles, setProfiles] = useState(fallback.profiles);
-  const [status, setStatus] = useState("Using demo profiles until backend auth is available.");
+  const [profiles, setProfiles] = useState([]);
+  const [status, setStatus] = useState("Sign in to load backend profiles.");
+  const [newProfileName, setNewProfileName] = useState("");
 
   useEffect(() => {
     const token = getToken();
     if (!token) return;
+    const cached = getCachedProfiles();
+    queueMicrotask(() => {
+      if (cached.length) {
+        setProfiles(cached);
+        setStatus("");
+      }
+    });
 
-    api
-      .me(token)
+    loadProfiles(token)
       .then((data) => {
-        setProfiles((data.profiles ?? []).map(mapProfile));
+        setProfiles(data.profiles ?? []);
         setStatus("");
       })
       .catch((error) => {
-        setStatus(`${error.message}. Showing mock profiles.`);
+        setStatus(cached.length ? "" : error.message);
       });
   }, []);
 
@@ -35,8 +42,26 @@ export default function ProfilesPage() {
 
   function logout() {
     clearToken();
-    setProfiles(fallback.profiles);
-    setStatus("Signed out. Showing mock profiles.");
+    setProfiles([]);
+    setStatus("Signed out.");
+  }
+
+  async function addProfile() {
+    const token = getToken();
+    const name = newProfileName.trim() || `Profile ${profiles.length + 1}`;
+    if (!token) {
+      setStatus("Sign in before creating profiles.");
+      return;
+    }
+
+    try {
+      const profile = await api.createProfile({ name }, token);
+      setProfiles((current) => [...current, mapProfile(profile)]);
+      setNewProfileName("");
+      setStatus("");
+    } catch (error) {
+      setStatus(error.message);
+    }
   }
 
   return (
@@ -52,16 +77,19 @@ export default function ProfilesPage() {
         <div className="profile-grid">
           {profiles.map((profile) => (
             <button className="profile-tile" type="button" onClick={() => selectProfile(profile.id)} key={profile.id}>
-              <Image src={profile.image} alt={`${profile.name} profile`} width={140} height={140} />
+              {profile.image ? <Image src={profile.image} alt={`${profile.name} profile`} width={140} height={140} /> : <span className="profile-placeholder">{profile.name.slice(0, 1)}</span>}
               <strong>{profile.name}</strong>
             </button>
           ))}
-          <button className="profile-tile" type="button">
+          <button className="profile-tile" type="button" onClick={addProfile}>
             <span className="icon-button" style={{ width: 140, height: 140 }}>
               <Icon name="add" />
             </span>
-            <strong>Add Profile</strong>
+            <strong>{newProfileName.trim() ? `Add ${newProfileName}` : "Add Profile"}</strong>
           </button>
+        </div>
+        <div className="actions" style={{ justifyContent: "center", marginTop: 22 }}>
+          <input className="field" style={{ maxWidth: 260 }} value={newProfileName} onChange={(event) => setNewProfileName(event.target.value)} placeholder="New profile name" />
         </div>
         <div className="actions" style={{ justifyContent: "center", marginTop: 34 }}>
           <Link className="btn btn-primary" href="/auth">
@@ -69,7 +97,7 @@ export default function ProfilesPage() {
             Sign In
           </Link>
           <button className="btn btn-ghost" onClick={logout} type="button">
-            Manage Profiles
+            Sign Out
           </button>
         </div>
       </section>

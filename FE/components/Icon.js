@@ -1,6 +1,7 @@
 import {
   Bell,
   ChevronRight,
+  Check,
   Clapperboard,
   Edit3,
   Flame,
@@ -19,11 +20,14 @@ import {
   ThumbsUp,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 
 const icons = {
   add: Plus,
+  check: Check,
   chevron_right: ChevronRight,
+  close: X,
   edit: Edit3,
   filter_list: ListFilter,
   group: Users,

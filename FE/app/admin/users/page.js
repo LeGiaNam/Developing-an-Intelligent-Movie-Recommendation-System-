@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/AdminShell";
 import { Icon } from "@/components/Icon";
 import { api } from "@/lib/api";
-import { users as mockUsers } from "@/lib/data";
 import { getToken } from "@/lib/auth";
 
 function mapUser(user) {
@@ -20,7 +19,7 @@ function mapUser(user) {
 }
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState([]);
   const [status, setStatus] = useState("Sign in as admin to load backend users.");
 
   useEffect(() => {
@@ -35,7 +34,7 @@ export default function AdminUsersPage() {
         setUsers(items.map(mapUser));
         setStatus("");
       })
-      .catch((error) => setStatus(`${error.message}. Showing mock users.`));
+      .catch((error) => setStatus(error.message));
   }, []);
 
   async function toggleStatus(user) {

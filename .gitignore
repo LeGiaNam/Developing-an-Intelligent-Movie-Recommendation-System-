@@ -54,3 +54,10 @@ env/
 mongo_data/
 redis_data/
 
+*.pkl
+*.joblib
+
+venv/
+.venv/
+.pytest_cache/
+__pycache__/

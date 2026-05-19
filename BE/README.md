@@ -1,19 +1,20 @@
 # IPANMOVIE Backend
 
-Backend được tổ chức theo hướng **modular backend + recommendation service riêng**:
+Backend is organized as a modular Node.js API plus a separate FastAPI Recommendation Service.
 
-- `apps/api`: Node.js/Fastify API phục vụ auth, profile, movie catalog, search, watchlist, rating, comment, admin.
-- `apps/recommendation-service`: FastAPI service độc lập để tích hợp code Recommendation System hiện có về sau.
-- `Redis`: cache kết quả recommendation để giảm thời gian phản hồi cho các truy vấn lặp lại.
-- `docs`: tài liệu kiến trúc, database và API.
+- `apps/api`: Fastify API for auth, profiles, movie catalog, search, watchlist, rating, comments, admin, and recommendation integration.
+- `apps/recommendation-service`: FastAPI service for the recommendation model and ranking logic.
+- `docs`: architecture, database, and API notes.
 
-## Chạy local
+## Local Run
+
+Run all backend services:
 
 ```bash
 docker compose up --build
 ```
 
-Hoặc chạy từng service:
+Run the Node API only:
 
 ```bash
 cd apps/api
@@ -21,52 +22,40 @@ npm install
 npm run dev
 ```
 
+Run the Recommendation Service only:
+
 ```bash
 cd apps/recommendation-service
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
 
-Recommendation model/training da duoc dat trong `apps/recommendation-service`. Neu can train model, dat CSV vao `apps/recommendation-service/data` va chay:
-
-```bash
-cd apps/recommendation-service
-python training/train.py
-```
-
-Redis local mặc định:
-
-```bash
-redis://localhost:6379/0
-```
-
-Các cache RS hiện có:
-
-- `similar`: theo `movieId`
-- `personalized`: theo `profileId`
-- `trending`: toàn hệ thống
-
-Khi user `rating` hoặc cập nhật `watch history`, backend sẽ gọi sang RS để xóa cache liên quan trước khi lần đọc tiếp theo được tính lại.
-
-## Seed dữ liệu demo
+## Seed Demo Data
 
 ```bash
 cd apps/api
 npm run seed
 ```
 
-Tài khoản demo:
+Demo accounts:
 
 - Admin: `admin@ipanmovie.local` / `Password@123`
 - User: `user@ipanmovie.local` / `Password@123`
 
-Mock Google login:
+## Auth
 
-- `GET /api/v1/auth/google/mock`
+Auth currently uses email/password only.
 
-## Cổng mặc định
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+
+Register creates an active user and a default profile, then returns an access token. External provider sign-in and separate email confirmation flows are intentionally not part of the current flow.
+
+## Default Ports
 
 - API backend: `http://localhost:4000`
 - Recommendation service: `http://localhost:8001`
-- MongoDB: `mongodb://localhost:27017/ipanmovie`
 - Redis: `redis://localhost:6379/0`
+
+MongoDB is configured through `MONGODB_URI`. For this project, use the Atlas connection string from the environment instead of a hardcoded local MongoDB URL.

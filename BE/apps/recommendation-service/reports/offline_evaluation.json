@@ -1,0 +1,25 @@
+{
+  "dataset": {
+    "movies": 60,
+    "users": 3,
+    "ratings": 20
+  },
+  "rating_prediction_baseline": {
+    "rmse": 0.8888,
+    "mae": 0.81
+  },
+  "top_n_baseline": {
+    "k": 10,
+    "precision_at_k": 0.0,
+    "recall_at_k": 0.0,
+    "map": 0.0,
+    "ndcg": 0.0,
+    "coverage": 0.2667,
+    "diversity": 0.8331,
+    "novelty": 5.3219
+  },
+  "readiness": {
+    "offline_metrics_available": true,
+    "minimum_sample_warning": true
+  }
+}

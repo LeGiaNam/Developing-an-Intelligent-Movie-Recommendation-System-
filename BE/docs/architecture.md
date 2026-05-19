@@ -1,83 +1,79 @@
-# Kiến trúc đề xuất cho IPANMOVIE
+# IPANMOVIE Architecture
 
-## Quyết định chính
+## Main Decision
 
-Hệ thống dùng **Node.js backend chính + FastAPI recommendation service riêng**.
+The system uses a modular Node.js API as the main backend and a separate FastAPI service for Recommendation System work.
 
-Lý do:
+This keeps product logic and ML logic separated:
 
-1. Yêu cầu web xem phim hiện tại tập trung vào nghiệp vụ CRUD, auth, search, admin và tương tác người dùng; Node.js xử lý rất phù hợp.
-2. Recommendation System là miền nghiệp vụ khác biệt, có vòng đời model riêng, phụ thuộc Python/ML riêng; tách FastAPI ngay từ đầu giúp tích hợp code RS sẵn có mà không làm phình backend chính.
-3. Chưa nên tách quá nhiều microservice ở giai đoạn đầu vì sẽ tăng chi phí vận hành, tracing, auth liên service và đồng bộ dữ liệu.
+- Node.js API handles auth, profiles, movies, search, watchlist, ratings, comments, admin, and frontend-facing `/api/v1` endpoints.
+- FastAPI Recommendation Service handles recommendation model loading, ranking, metrics, cache, and model artifacts.
+- MongoDB Atlas is the source database for app data.
+- Redis is used by the Recommendation Service for low-latency cached recommendation responses.
 
-## Sơ đồ tổng quát
+## High-Level Flow
 
 ```mermaid
 flowchart LR
-    FE["Frontend Next.js"] --> API["Node.js API Backend"]
-    API --> DB["MongoDB"]
+    FE["Next.js Frontend"] --> API["Node.js API"]
+    API --> DB["MongoDB Atlas"]
     API --> RS["FastAPI Recommendation Service"]
+    RS --> DB
     RS --> REDIS["Redis Cache"]
-    RS --> API
-    API --> STORAGE["Object Storage/CDN"]
-    API --> MAIL["Email Provider"]
 ```
 
-## Ranh giới module trong Node.js API
+## Node.js API Modules
 
-- `auth`: đăng ký, xác thực OTP, login, quên mật khẩu, Google OAuth.
-- `profiles`: tối đa 5 profile/account, avatar, kids mode, PIN.
-- `movies`: metadata phim, tập phim, chi tiết phim.
-- `search`: tìm kiếm, filter, autosuggest.
-- `watchlist`: danh sách của tôi theo từng profile.
-- `ratings`: rating 1-5 sao.
-- `comments`: comment/reply, chống spam.
-- `admin`: quản lý phim, tập phim, user, khóa/mở khóa tài khoản.
-- `integrations/recommendation`: client gọi sang FastAPI RS.
+- `auth`: email/password register, login, JWT session, current user.
+- `profiles`: profile management per account.
+- `movies`: movie metadata, detail, episodes, similar movies.
+- `search`: search and browse filters.
+- `watchlist`: profile watchlist.
+- `ratings`: user ratings for movies.
+- `comments`: movie comments and replies.
+- `admin`: movie and user administration.
+- `recommendation-events`: event tracking for recommendation metrics.
+- `integrations/recommendation`: HTTP client to the FastAPI service.
 
-## Chiến lược cache recommendation
+## Auth Boundary
 
-- `recommendations:similar:{movieId}`: phim tương tự, TTL mặc định 300 giây.
-- `recommendations:personalized:{profileId}`: gợi ý cá nhân hóa theo profile.
-- `recommendations:trending:global`: danh sách thịnh hành toàn hệ thống.
+Auth is intentionally simple for the current phase:
 
-Invalidation:
+- email/password only
+- JWT access token
+- default profile created during register
+- no separate email confirmation step
+- no external provider sign-in
 
-- User rating phim → xóa cache personalized của profile đó và trending toàn cục.
-- User cập nhật watch history → xóa personalized của profile đó.
-- User xem hoàn thành phim → đồng thời xóa trending toàn cục.
-
-## Luồng gợi ý phim
+## Recommendation Flow
 
 ```mermaid
 sequenceDiagram
     participant FE as Frontend
     participant API as Node API
-    participant RS as FastAPI RS
+    participant RS as Recommendation Service
+    participant DB as MongoDB Atlas
     participant REDIS as Redis
-    participant DB as MongoDB
 
-    FE->>API: GET /api/v1/movies/:id
-    API->>DB: Lấy movie detail
-    API->>RS: GET /v1/recommendations/similar/:movieId
-    RS->>REDIS: kiểm tra cache
-    alt cache hit
-        REDIS-->>RS: danh sách movieId + score
-    else cache miss
-        RS->>RS: chạy logic/model recommendation
-        RS->>REDIS: lưu kết quả TTL
+    FE->>API: GET /api/v1/profiles/:profileId/recommendations
+    API->>RS: GET /v1/recommendations/personalized/:profileId
+    RS->>REDIS: Check cache
+    alt Cache hit
+        REDIS-->>RS: movie ids and scores
+    else Cache miss
+        RS->>DB: Load profile interactions and movie data
+        RS->>RS: Rank recommendations
+        RS->>REDIS: Save result with TTL
     end
-    RS-->>API: danh sách movieId + score
-    API->>DB: hydrate metadata phim
-    API-->>FE: detail + similarMovies
+    RS-->>API: movie ids and scores
+    API->>DB: Hydrate movie metadata
+    API-->>FE: movie cards
 ```
 
-## Khi nào nên tách thêm service?
+## When To Split More Services
 
-Chỉ tách tiếp khi có áp lực thật:
+Keep the current architecture until there is real pressure to split:
 
-- `media-processing-service`: khi encode video trở thành pipeline nặng.
-- `search-service`: khi MongoDB Atlas Search không còn đủ và cần Elasticsearch/OpenSearch.
-- `notification-service`: khi email/push trở thành luồng riêng có queue.
-
-Trước ngưỡng đó, backend module hóa là lựa chọn bền hơn microservice hóa cực đoan.
+- media processing becomes heavy enough to need its own queue and workers
+- search needs Elasticsearch/OpenSearch instead of MongoDB Atlas Search
+- notifications need a separate queue and delivery lifecycle

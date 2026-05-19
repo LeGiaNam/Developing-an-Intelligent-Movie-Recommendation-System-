@@ -1,10 +1,13 @@
 import { ok } from "../../common/utils/response.js";
 import { Movie } from "./movie.model.js";
 import { Episode } from "./episode.model.js";
-import { getSimilarMovies, getTrendingMovies } from "../../integrations/recommendation/recommendation.client.js";
+import {
+  getHydratedSimilarRecommendations,
+  getHydratedTrendingRecommendations,
+} from "../../integrations/recommendation/recommendation.hydrator.js";
 
 export async function movieRoutes(app) {
-  app.get("/discovery/trending", async () => ok(await getTrendingMovies()));
+  app.get("/discovery/trending", async () => ok(await getHydratedTrendingRecommendations()));
 
   app.get("/", async (request) => {
     const page = Math.max(Number(request.query.page ?? 1), 1);
@@ -26,7 +29,7 @@ export async function movieRoutes(app) {
   });
 
   app.get("/:movieId/similar", async (request) => {
-    const similar = await getSimilarMovies(request.params.movieId);
+    const similar = await getHydratedSimilarRecommendations(request.params.movieId);
     return ok(similar);
   });
 }

@@ -1,272 +1,162 @@
-import mongoose from 'mongoose';
-import { faker } from '@faker-js/faker';
-import { connectDatabase } from '../config/db.js';
-import { env } from '../config/env.js';
+import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
+import { faker } from "@faker-js/faker";
+import { connectDatabase, disconnectDatabase } from "../config/db.js";
+import { User } from "../modules/auth/user.model.js";
+import { Profile } from "../modules/profiles/profile.model.js";
+import { Movie } from "../modules/movies/movie.model.js";
+import { Episode } from "../modules/movies/episode.model.js";
+import { Watchlist } from "../modules/watchlist/watchlist.model.js";
+import { Rating } from "../modules/ratings/rating.model.js";
+import { Comment } from "../modules/comments/comment.model.js";
+import { WatchHistory } from "../modules/watch-history/watch-history.model.js";
+import { normalizeText } from "../common/utils/normalizeText.js";
 
-// ==========================================
-// 1. Mongoose Schemas & Models Definition
-// ==========================================
+const posterImages = [
+  "https://images.unsplash.com/photo-1485846234645-a62644f84728",
+  "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba",
+  "https://images.unsplash.com/photo-1536440136628-849c177e76a1",
+  "https://images.unsplash.com/photo-1517602302552-471fe67acf66",
+  "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4",
+];
 
-const userSchema = new mongoose.Schema({
-  email: { type: String, unique: true },
-  password: { type: String },
-  auth_type: { type: String, enum: ['email', 'google'] },
-  status: { type: String, enum: ['active', 'pending'] },
-  created_at: { type: Date, default: Date.now }
-});
-const User = mongoose.model('User', userSchema);
+const backdropImages = [
+  "https://images.unsplash.com/photo-1440404653325-ab127d49abc1",
+  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
+  "https://images.unsplash.com/photo-1504384308090-c894fdcc538d",
+  "https://images.unsplash.com/photo-1520034475321-cbe63696469a",
+  "https://images.unsplash.com/photo-1518709268805-4e9042af2176",
+];
 
-const profileSchema = new mongoose.Schema({
-  user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  profile_name: { type: String },
-  avatar_url: { type: String },
-  is_kids: { type: Boolean },
-  pin_code: { type: String, default: null },
-  watchlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Movie' }]
-});
-const Profile = mongoose.model('Profile', profileSchema);
-
-const movieSchema = new mongoose.Schema({
-  title: String,
-  slug: String,
-  description: String,
-  backdrop_url: String,
-  poster_url: String,
-  trailer_url: String,
-  directors: [String],
-  casts: [String],
-  genres: [String],
-  release_year: Number,
-  country: String,
-  rating_avg: Number,
-  is_series: Boolean,
-  episodes: [{
-    episode_number: Number,
-    title: String,
-    video_url: String,
-    duration: Number
-  }],
-  is_deleted: { type: Boolean, default: false }
-});
-const Movie = mongoose.model('Movie', movieSchema);
-
-const commentSchema = new mongoose.Schema({
-  movie_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Movie' },
-  profile_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile' },
-  profile_name: String,
-  content: String,
-  replies: [{
-    profile_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile' },
-    profile_name: String,
-    content: String,
-    created_at: { type: Date, default: Date.now }
-  }]
-});
-const Comment = mongoose.model('Comment', commentSchema);
-
-const ratingSchema = new mongoose.Schema({
-  movie_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Movie' },
-  profile_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile' },
-  score: Number
-});
-const Rating = mongoose.model('Rating', ratingSchema);
-
-const searchLogSchema = new mongoose.Schema({
-  keyword: String,
-  profile_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile' },
-  results_count: Number
-});
-const SearchLog = mongoose.model('SearchLog', searchLogSchema);
-
-// ==========================================
-// 2. Main Seeding Function
-// ==========================================
-
-async function seedDatabase() {
-  try {
-    const connection = await connectDatabase();
-    if (!connection) process.exit(1);
-
-    // Cleanup Step
-    console.log('Cleaning up existing data...');
-    await User.deleteMany({});
-    await Profile.deleteMany({});
-    await Movie.deleteMany({});
-    await Comment.deleteMany({});
-    await Rating.deleteMany({});
-    await SearchLog.deleteMany({});
-    console.log('Cleanup completed.');
-
-    // Arrays to hold mock data
-    const users = [];
-    const profiles = [];
-    const movies = [];
-    const comments = [];
-    const ratings = [];
-    const searchLogs = [];
-
-    console.log('Generating Mock Data...');
-
-    // Generate 100 Users
-    for (let i = 0; i < 100; i++) {
-      const authType = faker.helpers.arrayElement(['email', 'google']);
-      users.push({
-        _id: new mongoose.Types.ObjectId(),
-        email: faker.internet.email({ provider: faker.helpers.arrayElement(['gmail.com', 'yahoo.com']) }),
-        password: authType === 'email' ? `$2b$10$${faker.string.alphanumeric(43)}` : '', // Mock hashed password
-        auth_type: authType,
-        status: faker.helpers.arrayElement(['active', 'pending']),
-        created_at: faker.date.past({ years: 2 })
-      });
-    }
-
-    // Generate 100 Profiles (1 per User to strictly meet the 100 profiles constraint)
-    for (let i = 0; i < 100; i++) {
-      const isKids = faker.datatype.boolean();
-      profiles.push({
-        _id: new mongoose.Types.ObjectId(),
-        user_id: users[i]._id,
-        profile_name: faker.person.firstName(),
-        avatar_url: faker.image.avatar(), // Using faker dummy image
-        is_kids: isKids,
-        pin_code: !isKids && faker.datatype.boolean() ? faker.string.numeric(4) : null,
-        watchlist: [] // Will populate after movies are created
-      });
-    }
-
-    // Generate 100 Movies
-    const genresList = ['Action', 'Comedy', 'Sci-Fi', 'Horror', 'Romance', 'Drama', 'Documentary', 'Animation', 'Thriller'];
-    const countriesList = ['USA', 'Vietnam', 'Korea', 'UK', 'Japan', 'France'];
-
-    for (let i = 0; i < 100; i++) {
-      const isSeries = faker.datatype.boolean();
-      const numEpisodes = isSeries ? faker.number.int({ min: 5, max: 24 }) : 0;
-      const episodes = [];
-
-      if (isSeries) {
-        for (let j = 1; j <= numEpisodes; j++) {
-          episodes.push({
-            episode_number: j,
-            title: `Episode ${j}: ${faker.lorem.words({ min: 2, max: 5 })}`,
-            video_url: `https://www.youtube.com/watch?v=${faker.string.alphanumeric(11)}`,
-            duration: faker.number.int({ min: 20, max: 60 }) // duration in minutes
-          });
-        }
-      }
-
-      movies.push({
-        _id: new mongoose.Types.ObjectId(),
-        title: faker.lorem.words({ min: 1, max: 4 }),
-        slug: faker.lorem.slug(),
-        description: faker.lorem.paragraph(),
-        backdrop_url: faker.image.urlLoremFlickr({ category: 'city' }),
-        poster_url: faker.image.urlLoremFlickr({ category: 'movie' }),
-        trailer_url: `https://www.youtube.com/watch?v=${faker.string.alphanumeric(11)}`,
-        directors: Array.from({ length: faker.number.int({ min: 1, max: 2 }) }, () => faker.person.fullName()),
-        casts: Array.from({ length: faker.number.int({ min: 3, max: 8 }) }, () => faker.person.fullName()),
-        genres: faker.helpers.arrayElements(genresList, faker.number.int({ min: 1, max: 3 })),
-        release_year: faker.number.int({ min: 2010, max: 2026 }),
-        country: faker.helpers.arrayElement(countriesList),
-        rating_avg: faker.number.float({ min: 3.0, max: 5.0, fractionDigits: 1 }),
-        is_series: isSeries,
-        episodes: episodes,
-        is_deleted: false
-      });
-    }
-
-    // Populate profile watchlists now that we have movies
-    for (let i = 0; i < 100; i++) {
-      const numWatchlist = faker.number.int({ min: 0, max: 10 });
-      const watchlistMovies = faker.helpers.arrayElements(movies, numWatchlist);
-      profiles[i].watchlist = watchlistMovies.map(m => m._id);
-    }
-
-    // Generate 100 Comments
-    for (let i = 0; i < 100; i++) {
-      const randomMovie = faker.helpers.arrayElement(movies);
-      const randomProfile = faker.helpers.arrayElement(profiles);
-
-      const numReplies = faker.number.int({ min: 0, max: 3 });
-      const replies = [];
-      for (let j = 0; j < numReplies; j++) {
-        const replyProfile = faker.helpers.arrayElement(profiles);
-        replies.push({
-          profile_id: replyProfile._id,
-          profile_name: replyProfile.profile_name,
-          content: faker.lorem.sentence(),
-          created_at: faker.date.recent({ days: 30 })
-        });
-      }
-
-      comments.push({
-        _id: new mongoose.Types.ObjectId(),
-        movie_id: randomMovie._id,
-        profile_id: randomProfile._id,
-        profile_name: randomProfile.profile_name,
-        content: faker.lorem.sentences({ min: 1, max: 3 }),
-        replies: replies
-      });
-    }
-
-    // Generate 100 Ratings
-    for (let i = 0; i < 100; i++) {
-      const randomMovie = faker.helpers.arrayElement(movies);
-      const randomProfile = faker.helpers.arrayElement(profiles);
-
-      ratings.push({
-        _id: new mongoose.Types.ObjectId(),
-        movie_id: randomMovie._id,
-        profile_id: randomProfile._id,
-        score: faker.number.int({ min: 1, max: 5 })
-      });
-    }
-
-    // Generate 100 SearchLogs
-    const popularKeywords = ['Batman', 'Avenger', 'Action', 'Comedy', 'Love', 'War', 'Space', 'Zombie', 'Spiderman', 'Matrix'];
-    for (let i = 0; i < 100; i++) {
-      const randomProfile = faker.helpers.arrayElement(profiles);
-
-      searchLogs.push({
-        _id: new mongoose.Types.ObjectId(),
-        keyword: faker.helpers.arrayElement(popularKeywords),
-        profile_id: randomProfile._id,
-        results_count: faker.number.int({ min: 0, max: 50 })
-      });
-    }
-
-    // Insert Data using insertMany for high performance
-    console.log('Inserting Users...');
-    await User.insertMany(users);
-    console.log(`Inserted ${users.length} Users.`);
-
-    console.log('Inserting Profiles...');
-    await Profile.insertMany(profiles);
-    console.log(`Inserted ${profiles.length} Profiles.`);
-
-    console.log('Inserting Movies...');
-    await Movie.insertMany(movies);
-    console.log(`Inserted ${movies.length} Movies.`);
-
-    console.log('Inserting Comments...');
-    await Comment.insertMany(comments);
-    console.log(`Inserted ${comments.length} Comments.`);
-
-    console.log('Inserting Ratings...');
-    await Rating.insertMany(ratings);
-    console.log(`Inserted ${ratings.length} Ratings.`);
-
-    console.log('Inserting SearchLogs...');
-    await SearchLog.insertMany(searchLogs);
-    console.log(`Inserted ${searchLogs.length} SearchLogs.`);
-
-    console.log('Database seeding completed successfully!');
-  } catch (error) {
-    console.error('Error during database seeding:', error);
-  } finally {
-    console.log('Disconnecting from MongoDB...');
-    await mongoose.disconnect();
-    console.log('Disconnected.');
-  }
+function imageFrom(list, index) {
+  return `${list[index % list.length]}?auto=format&fit=crop&w=900&q=80`;
 }
 
-seedDatabase();
+async function seedDatabase() {
+  await connectDatabase();
+
+  console.log("Cleaning up existing data...");
+  await Promise.all([
+    User.deleteMany({}),
+    Profile.deleteMany({}),
+    Movie.deleteMany({}),
+    Episode.deleteMany({}),
+    Watchlist.deleteMany({}),
+    Rating.deleteMany({}),
+    Comment.deleteMany({}),
+    WatchHistory.deleteMany({}),
+  ]);
+  console.log("Cleanup completed.");
+
+  const passwordHash = await bcrypt.hash("Password@123", 12);
+  const [admin, user] = await User.create([
+    { email: "admin@ipanmovie.local", passwordHash, status: "active", role: "admin" },
+    { email: "user@ipanmovie.local", passwordHash, status: "active", role: "user" },
+  ]);
+
+  const [adminProfile, mainProfile, kidsProfile] = await Profile.create([
+    { userId: admin._id, name: "Admin" },
+    { userId: user._id, name: "Alex", avatarUrl: "https://i.pravatar.cc/240?img=12" },
+    { userId: user._id, name: "Kids", isKids: true, avatarUrl: "https://i.pravatar.cc/240?img=33" },
+  ]);
+
+  const genresList = ["Action", "Comedy", "Sci-Fi", "Horror", "Romance", "Drama", "Documentary", "Animation", "Thriller"];
+  const countriesList = ["USA", "Vietnam", "Korea", "UK", "Japan", "France"];
+
+  const movies = Array.from({ length: 60 }, (_, index) => {
+    const title = faker.helpers.arrayElement([
+      "Neon Horizons",
+      "Echoes of Eternity",
+      "The Silent Protocol",
+      "Realms of Valor",
+      "Dune Walkers",
+      "The Room Beyond",
+      faker.word.words({ count: { min: 2, max: 4 } }),
+    ]);
+    const type = faker.helpers.arrayElement(["movie", "series"]);
+    const releaseYear = faker.number.int({ min: 2010, max: 2026 });
+    const averageRating = faker.number.float({ min: 3.1, max: 5, precision: 0.1 });
+
+    return {
+      _id: new mongoose.Types.ObjectId(),
+      title: `${title} ${index + 1}`,
+      slug: faker.helpers.slugify(`${title}-${index + 1}`).toLowerCase(),
+      normalizedTitle: normalizeText(`${title} ${index + 1}`),
+      description: faker.lorem.paragraph(),
+      type,
+      genres: faker.helpers.arrayElements(genresList, faker.number.int({ min: 1, max: 3 })),
+      countries: faker.helpers.arrayElements(countriesList, faker.number.int({ min: 1, max: 2 })),
+      releaseYear,
+      cast: Array.from({ length: 4 }, () => faker.person.fullName()),
+      directors: Array.from({ length: 1 }, () => faker.person.fullName()),
+      ageRating: faker.helpers.arrayElement(["PG", "PG-13", "TV-14", "R"]),
+      posterUrl: imageFrom(posterImages, index),
+      backdropUrl: imageFrom(backdropImages, index),
+      trailerUrl: `https://www.youtube.com/watch?v=${faker.string.alphanumeric(11)}`,
+      averageRating,
+      ratingCount: faker.number.int({ min: 10, max: 1000 }),
+      isDeleted: false,
+    };
+  });
+
+  await Movie.insertMany(movies);
+
+  const series = movies.filter((movie) => movie.type === "series").slice(0, 10);
+  await Episode.insertMany(
+    series.flatMap((movie) =>
+      Array.from({ length: 4 }, (_, index) => ({
+        movieId: movie._id,
+        seasonNumber: 1,
+        episodeNumber: index + 1,
+        title: `Episode ${index + 1}: ${faker.lorem.words({ min: 2, max: 4 })}`,
+        durationSeconds: faker.number.int({ min: 1200, max: 3600 }),
+        videoSources: [{ quality: "1080p", url: `https://example.com/videos/${movie.slug}-${index + 1}.mp4` }],
+      }))
+    )
+  );
+
+  await Watchlist.insertMany(
+    movies.slice(0, 8).map((movie) => ({ profileId: mainProfile._id, movieId: movie._id }))
+  );
+
+  await Rating.insertMany(
+    movies.slice(0, 20).map((movie) => ({
+      profileId: faker.helpers.arrayElement([mainProfile._id, kidsProfile._id, adminProfile._id]),
+      movieId: movie._id,
+      score: faker.number.int({ min: 3, max: 5 }),
+    }))
+  );
+
+  await Comment.insertMany(
+    movies.slice(0, 12).map((movie) => ({
+      profileId: mainProfile._id,
+      movieId: movie._id,
+      content: faker.lorem.sentence(),
+    }))
+  );
+
+  await WatchHistory.insertMany(
+    movies.slice(10, 16).map((movie) => ({
+      profileId: mainProfile._id,
+      movieId: movie._id,
+      progressSeconds: faker.number.int({ min: 300, max: 3600 }),
+      durationSeconds: 5400,
+      completed: false,
+      lastWatchedAt: faker.date.recent({ days: 20 }),
+    }))
+  );
+
+  console.log("Database seeding completed successfully!");
+  console.log({
+    admin: "admin@ipanmovie.local / Password@123",
+    user: "user@ipanmovie.local / Password@123",
+    movies: movies.length,
+    profiles: 3,
+  });
+}
+
+try {
+  await seedDatabase();
+} finally {
+  await disconnectDatabase();
+}

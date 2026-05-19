@@ -17,6 +17,7 @@ Ví dụ sử dụng:
 """
 
 import pickle
+import json
 import warnings
 from pathlib import Path
 from typing import List, Dict, Optional, Any
@@ -31,6 +32,7 @@ from app.core.config import (
     ENCODERS_PATH,
     MOVIES_PKL_PATH,
     RATINGS_PKL_PATH,
+    ID_MAP_PATH,
 )
 
 warnings.filterwarnings("ignore")
@@ -64,6 +66,7 @@ class HybridMovieRecommender:
         self._encoders: Dict[str, Any] = {}
         self._movies_df: Optional[pd.DataFrame] = None
         self._ratings_df: Optional[pd.DataFrame] = None
+        self._id_map: Dict[str, Dict[str, str]] = {"movies": {}, "profiles": {}}
         self._is_loaded = False
         self._load_models()
 
@@ -84,7 +87,7 @@ class HybridMovieRecommender:
                 + "\n".join(f"  - {p}" for p in missing)
             )
 
-        print("[Recommender] Đang load models...")
+        print("[Recommender] Loading models...")
 
         # Load SVD (scikit-surprise dùng pickle)
         with open(SVD_MODEL_PATH, "rb") as f:
@@ -99,9 +102,11 @@ class HybridMovieRecommender:
         # Load DataFrames
         self._movies_df = pd.read_pickle(MOVIES_PKL_PATH)
         self._ratings_df = pd.read_pickle(RATINGS_PKL_PATH)
+        if ID_MAP_PATH.exists():
+            self._id_map = json.loads(ID_MAP_PATH.read_text(encoding="utf-8"))
 
         self._is_loaded = True
-        print(f"[Recommender] ✅ Load xong! Tổng số phim: {len(self._movies_df)}")
+        print(f"[Recommender] Load complete. Total movies: {len(self._movies_df)}")
 
     # ------------------------------------------------------------------
     # HELPER
@@ -115,6 +120,25 @@ class HybridMovieRecommender:
         """Trả về tập hợp các movieId mà user đã xem (đã rating)."""
         watched = self._ratings_df[self._ratings_df["userId"] == user_id]["movieId"]
         return set(watched.tolist())
+
+    def resolve_numeric_movie_id(self, movie_id: str) -> Optional[int]:
+        if str(movie_id).isdigit():
+            return int(movie_id)
+        if self._movies_df is not None and "mongoMovieId" in self._movies_df.columns:
+            matches = self._movies_df[self._movies_df["mongoMovieId"].astype(str) == str(movie_id)]
+            if not matches.empty:
+                return int(matches.iloc[0]["movieId"])
+        for numeric_id, mongo_id in self._id_map.get("movies", {}).items():
+            if mongo_id == str(movie_id):
+                return int(numeric_id)
+        return None
+
+    def movie_object_id(self, movie_id: int) -> Optional[str]:
+        if self._movies_df is not None and "mongoMovieId" in self._movies_df.columns:
+            matches = self._movies_df[self._movies_df["movieId"] == int(movie_id)]
+            if not matches.empty:
+                return str(matches.iloc[0].get("mongoMovieId"))
+        return self._id_map.get("movies", {}).get(str(movie_id))
 
     def predict_svd_score(self, user_id: int, movie_id: int) -> float:
         """
@@ -211,7 +235,7 @@ class HybridMovieRecommender:
         """
         # Nếu user chưa tồn tại trong hệ thống → fallback sang popular
         if not self.is_existing_user(user_id):
-            print(f"[Recommender] User {user_id} chưa có dữ liệu → fallback sang popular")
+            print(f"[Recommender] User {user_id} has no training data; fallback to popular")
             return self.recommend_popular(top_k=top_k)
 
         # Lấy danh sách phim chưa xem
@@ -219,7 +243,7 @@ class HybridMovieRecommender:
         candidate_movies = self._movies_df[~self._movies_df["movieId"].isin(watched_ids)].copy()
 
         if candidate_movies.empty:
-            print(f"[Recommender] User {user_id} đã xem hết phim → trả về popular")
+            print(f"[Recommender] User {user_id} has watched all candidates; fallback to popular")
             return self.recommend_popular(top_k=top_k)
 
         # Tính điểm cho từng phim
@@ -233,6 +257,7 @@ class HybridMovieRecommender:
 
             results.append({
                 "movieId": movie_id,
+                "movieObjectId": self.movie_object_id(movie_id),
                 "title": str(movie_row.get("title", "")),
                 "genres": str(movie_row.get("genres", "")),
                 "svd_score": round(svd_score, 4),
@@ -274,6 +299,7 @@ class HybridMovieRecommender:
             score = round(float(row["bayesian_score"]), 4)
             results.append({
                 "movieId": int(row["movieId"]),
+                "movieObjectId": self.movie_object_id(int(row["movieId"])),
                 "title": str(row.get("title", "")),
                 "genres": str(row.get("genres", "")),
                 "svd_score": score,
@@ -324,6 +350,7 @@ class HybridMovieRecommender:
             score = round(float(row["bayesian_score"]), 4)
             results.append({
                 "movieId": int(row["movieId"]),
+                "movieObjectId": self.movie_object_id(int(row["movieId"])),
                 "title": str(row.get("title", "")),
                 "genres": str(row.get("genres", "")),
                 "svd_score": score,
