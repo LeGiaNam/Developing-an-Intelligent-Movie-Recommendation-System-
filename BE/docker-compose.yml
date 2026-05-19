@@ -20,6 +20,8 @@ services:
     container_name: ipanmovie-api
     env_file:
       - ./apps/api/.env.example
+    volumes:
+      - ./apps/api/src/scripts:/app/scripts
     environment:
       MONGODB_URI: mongodb://mongo:27017/ipanmovie
       RECOMMENDATION_SERVICE_URL: http://recommendation-service:8001
