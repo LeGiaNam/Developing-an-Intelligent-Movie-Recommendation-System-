@@ -1,4 +1,5 @@
-import "dotenv/config";
+import dotenv from 'dotenv'
+dotenv.config({ path: "../../.env" })
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),
@@ -6,4 +7,3 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET ?? "change-me",
   recommendationServiceUrl: process.env.RECOMMENDATION_SERVICE_URL ?? "http://localhost:8001",
 };
-
