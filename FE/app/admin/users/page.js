@@ -1,9 +1,52 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/AdminShell";
 import { Icon } from "@/components/Icon";
-import { users } from "@/lib/data";
+import { api } from "@/lib/api";
+import { users as mockUsers } from "@/lib/data";
+import { getToken } from "@/lib/auth";
+
+function mapUser(user) {
+  return {
+    id: user._id ?? user.id ?? user.email,
+    name: user.email?.split("@")[0] ?? user.name ?? "User",
+    email: user.email,
+    role: user.role ?? "user",
+    status: user.status ?? "active",
+    lastSeen: user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : "N/A",
+  };
+}
 
 export default function AdminUsersPage() {
+  const [users, setUsers] = useState(mockUsers);
+  const [status, setStatus] = useState("Sign in as admin to load backend users.");
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      return;
+    }
+
+    api
+      .adminUsers(token)
+      .then((items) => {
+        setUsers(items.map(mapUser));
+        setStatus("");
+      })
+      .catch((error) => setStatus(`${error.message}. Showing mock users.`));
+  }, []);
+
+  async function toggleStatus(user) {
+    const token = getToken();
+    const nextStatus = user.status === "suspended" ? "active" : "suspended";
+    if (!token) return;
+
+    setUsers((current) => current.map((item) => (item.id === user.id ? { ...item, status: nextStatus } : item)));
+    await api.updateUserStatus(user.id, nextStatus, token).catch((error) => setStatus(error.message));
+  }
+
   return (
     <AdminShell active="/admin/users">
       <div className="section-header">
@@ -11,7 +54,7 @@ export default function AdminUsersPage() {
           <h1 className="title-xl" style={{ fontSize: "clamp(38px, 5vw, 64px)" }}>
             User Management
           </h1>
-          <p className="muted">Review account status, role, subscriptions, and access controls.</p>
+          <p className="muted">{status || "Review account status, role, subscriptions, and access controls."}</p>
         </div>
         <Link className="btn btn-primary" href="/admin/users/new">
           <Icon name="person_add" />
@@ -46,8 +89,8 @@ export default function AdminUsersPage() {
                   <button className="icon-button" aria-label="Edit user">
                     <Icon name="edit" />
                   </button>
-                  <button className="icon-button" aria-label="Lock user">
-                    <Icon name={user.status === "Suspended" ? "lock" : "lock_open"} />
+                  <button className="icon-button" aria-label="Lock user" onClick={() => toggleStatus(user)}>
+                    <Icon name={user.status === "suspended" || user.status === "Suspended" ? "lock" : "lock_open"} />
                   </button>
                 </td>
               </tr>

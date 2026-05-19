@@ -1,7 +1,7 @@
 """
 test_api.py - Test FastAPI endpoints
 =====================================
-Yêu cầu: Server phải đang chạy tại http://127.0.0.1:8000
+Yeu cau: Server phai dang chay tai http://127.0.0.1:8001
 
 Chạy server trước:
     uvicorn app.main:app --reload
@@ -18,7 +18,7 @@ except ImportError:
     print("Cài requests trước: pip install requests")
     sys.exit(1)
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:8001"
 
 
 def test_health():
@@ -32,7 +32,7 @@ def test_health():
 
 def test_popular(top_k: int = 10):
     print(f"\n[api-test] GET /popular?topK={top_k}")
-    resp = requests.get(f"{BASE_URL}/popular", params={"topK": top_k}, timeout=30)
+    resp = requests.get(f"{BASE_URL}/v1/popular", params={"topK": top_k}, timeout=30)
     assert resp.status_code == 200, f"Status: {resp.status_code} | Body: {resp.text[:200]}"
     data = resp.json()
     items = data.get("recommendations", [])
@@ -51,7 +51,7 @@ def test_recommend(user_id: int = 1):
         "topK": 10,
         "alpha": 0.7,
     }
-    resp = requests.post(f"{BASE_URL}/recommend", json=payload, timeout=60)
+    resp = requests.post(f"{BASE_URL}/v1/recommend", json=payload, timeout=60)
     assert resp.status_code == 200, f"Status: {resp.status_code} | Body: {resp.text[:300]}"
     data = resp.json()
     items = data.get("recommendations", [])
@@ -73,7 +73,7 @@ def test_recommend_cold_start(user_id: int = 99999):
         "topK": 5,
         "alpha": 0.7,
     }
-    resp = requests.post(f"{BASE_URL}/recommend", json=payload, timeout=30)
+    resp = requests.post(f"{BASE_URL}/v1/recommend", json=payload, timeout=30)
     assert resp.status_code == 200, f"Status: {resp.status_code} | Body: {resp.text[:200]}"
     data = resp.json()
     items = data.get("recommendations", [])
@@ -86,7 +86,7 @@ def test_recommend_genres():
         "genres": ["Action", "Adventure"],
         "topK": 5,
     }
-    resp = requests.post(f"{BASE_URL}/recommend/genres", json=payload, timeout=30)
+    resp = requests.post(f"{BASE_URL}/v1/recommend/genres", json=payload, timeout=30)
     assert resp.status_code == 200, f"Status: {resp.status_code} | Body: {resp.text[:200]}"
     data = resp.json()
     items = data.get("recommendations", [])

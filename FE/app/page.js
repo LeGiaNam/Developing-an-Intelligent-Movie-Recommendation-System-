@@ -1,25 +1,51 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
 import { Icon } from "@/components/Icon";
-import { images, movies } from "@/lib/data";
-import Image from "next/image";
+import { api, fallback, mapMovie } from "@/lib/api";
+import { images } from "@/lib/data";
+import { getActiveProfileId, getToken } from "@/lib/auth";
 
 export default function HomePage() {
+  const [catalog, setCatalog] = useState(fallback.movies);
+  const [recommended, setRecommended] = useState(fallback.movies);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    const token = getToken();
+    const profileId = getActiveProfileId();
+
+    api
+      .movies()
+      .then((items) => setCatalog(items.map(mapMovie)))
+      .catch(() => setStatus("Backend unavailable. Showing curated demo data."));
+
+    if (token && profileId) {
+      api
+        .personalized(profileId, token)
+        .then((items) => setRecommended(items.map(mapMovie)))
+        .catch(() => setRecommended(fallback.movies));
+    }
+  }, []);
+
+  const heroMovie = useMemo(() => catalog[1] ?? fallback.movies[1], [catalog]);
+  const featureMovie = catalog[0] ?? fallback.movies[0];
+
   return (
     <div className="app-shell">
       <NavBar active="/" />
-      <section className="hero" style={{ backgroundImage: `url(${images.homeHero})` }}>
+      <section className="hero" style={{ backgroundImage: `url(${heroMovie.backdropUrl || images.homeHero})` }}>
         <div className="hero-content">
           <div className="eyebrow">
             <span>New Release</span>
-            <span className="pill">PG-13</span>
-            <span className="muted">2h 15m</span>
+            <span className="pill">{heroMovie.genre}</span>
+            <span className="muted">{heroMovie.year}</span>
           </div>
-          <h1 className="title-xl">Echoes of Eternity</h1>
-          <p className="lead">
-            In a future where memories can be extracted and sold, a rogue archivist discovers a fragmented memory that holds
-            the key to humanity&apos;s survival.
-          </p>
+          <h1 className="title-xl">{heroMovie.title}</h1>
+          <p className="lead">{heroMovie.description || "A cinematic recommendation picked from the live IPANMOVIE catalog."}</p>
           <div className="actions">
             <button className="btn btn-primary">
               <Icon name="play_arrow" filled />
@@ -30,29 +56,30 @@ export default function HomePage() {
               My List
             </button>
           </div>
+          {status ? <p className="muted">{status}</p> : null}
         </div>
       </section>
-      <MovieRail title="Continue Watching" movies={movies.slice(2, 6)} wide />
+      <MovieRail title="Continue Watching" movies={catalog.slice(0, 6)} wide />
       <section className="section container">
         <div className="section-header">
           <h2 className="section-title">Trending Now</h2>
           <span className="pill">
             <Icon name="local_fire_department" filled />
-            #1 Trending
+            Live catalog
           </span>
         </div>
         <div className="feature-grid">
           <div className="poster-card" style={{ minHeight: 520, aspectRatio: "16 / 10" }}>
-            <Image src={movies[0].image} alt="Neon Horizons poster" fill sizes="(max-width: 980px) 100vw, 60vw" />
+            <Image src={featureMovie.image} alt={`${featureMovie.title} poster`} fill sizes="(max-width: 980px) 100vw, 60vw" />
             <div className="card-overlay">
-              <span className="pill">Hybrid Match · 98%</span>
-              <h3 className="section-title">Neon Horizons</h3>
-              <p className="muted">Cyberpunk scale, intimate stakes, and electric-blue recommendation confidence.</p>
+              <span className="pill">Hybrid Match / {featureMovie.rating}</span>
+              <h3 className="section-title">{featureMovie.title}</h3>
+              <p className="muted">{featureMovie.description || "Recommended from backend catalog data."}</p>
             </div>
           </div>
           <div className="grid-posters">
-            {movies.slice(1, 5).map((movie) => (
-              <div className="poster-card" key={movie.title}>
+            {catalog.slice(1, 5).map((movie) => (
+              <div className="poster-card" key={movie.id ?? movie.title}>
                 <Image src={movie.image} alt={`${movie.title} poster`} fill sizes="220px" />
                 <div className="card-overlay">
                   <h3 className="card-title">{movie.title}</h3>
@@ -63,7 +90,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      <MovieRail title="Because You Watched Sci-Fi" movies={movies} />
+      <MovieRail title="Because You Watched Sci-Fi" movies={recommended} />
     </div>
   );
 }

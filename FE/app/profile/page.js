@@ -1,20 +1,51 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Image from "next/image";
 import { MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
 import { Icon } from "@/components/Icon";
-import { images, movieImages, movies } from "@/lib/data";
-import Image from "next/image";
+import { api, fallback, mapMovie, mapProfile } from "@/lib/api";
+import { images, movieImages } from "@/lib/data";
+import { getActiveProfileId, getToken } from "@/lib/auth";
 
 export default function UserProfilePage() {
+  const [profile, setProfile] = useState({ name: "Alex Mercer", image: images.avatar });
+  const [user, setUser] = useState({ email: "alex@example.com" });
+  const [watchlist, setWatchlist] = useState(fallback.movies.slice(0, 6));
+  const [status, setStatus] = useState("Showing mock profile data until you sign in.");
+
+  useEffect(() => {
+    const token = getToken();
+    const activeProfileId = getActiveProfileId();
+    if (!token) return;
+
+    api
+      .me(token)
+      .then(async (data) => {
+        const selected = data.profiles?.find((item) => item._id === activeProfileId) ?? data.profiles?.[0];
+        if (selected) {
+          const mappedProfile = mapProfile(selected);
+          setProfile(mappedProfile);
+          const items = await api.watchlist(mappedProfile.id, token).catch(() => []);
+          setWatchlist(items.map((item, index) => mapMovie(item.movieId ?? item, index)));
+        }
+        setUser(data.user ?? { email: "" });
+        setStatus("");
+      })
+      .catch((error) => setStatus(`${error.message}. Showing mock profile data.`));
+  }, []);
+
   return (
     <div className="app-shell profile-page">
       <NavBar />
       <section className="profile-hero" style={{ backgroundImage: `url(${movieImages[3]})` }}>
         <div className="container">
-          <Image className="avatar" src={images.avatar} alt="Alex Mercer" width={92} height={92} style={{ width: 92, height: 92 }} />
+          <Image className="avatar" src={profile.image} alt={profile.name} width={92} height={92} style={{ width: 92, height: 92 }} />
           <h1 className="title-xl" style={{ fontSize: "clamp(38px, 5vw, 64px)" }}>
-            Alex Mercer
+            {profile.name}
           </h1>
-          <p className="muted">Premium profile · Sci-Fi, Thriller, Animation · 312 watched titles</p>
+          <p className="muted">{status || `Signed in as ${user.email ?? "IPANMOVIE user"}`}</p>
         </div>
       </section>
       <main className="container section">
@@ -24,11 +55,11 @@ export default function UserProfilePage() {
             <div className="form-grid">
               <label className="field-label">
                 Display name
-                <input className="field" defaultValue="Alex Mercer" />
+                <input className="field" value={profile.name} readOnly />
               </label>
               <label className="field-label">
                 Email
-                <input className="field" defaultValue="alex@example.com" />
+                <input className="field" value={user.email ?? ""} readOnly />
               </label>
             </div>
             <h2 className="section-title">Change Password</h2>
@@ -60,7 +91,7 @@ export default function UserProfilePage() {
           </aside>
         </div>
       </main>
-      <MovieRail title="Your Watchlist" movies={movies.slice(0, 6)} />
+      <MovieRail title="Your Watchlist" movies={watchlist.length ? watchlist : fallback.movies.slice(0, 6)} />
     </div>
   );
 }

@@ -1,8 +1,23 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/AdminShell";
 import { Icon } from "@/components/Icon";
-import { movies } from "@/lib/data";
+import { api, fallback, mapMovie } from "@/lib/api";
 
 export default function AdminPage() {
+  const [movies, setMovies] = useState(fallback.movies);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    api
+      .movies()
+      .then((items) => setMovies(items.map(mapMovie)))
+      .catch(() => setStatus("Backend unavailable. Showing mock catalog."));
+  }, []);
+
+  const seriesCount = movies.filter((movie) => movie.duration === "Series").length;
+
   return (
     <AdminShell active="/admin">
       <div className="section-header">
@@ -10,7 +25,7 @@ export default function AdminPage() {
           <h1 className="title-xl" style={{ fontSize: "clamp(38px, 5vw, 64px)" }}>
             Movie Manager
           </h1>
-          <p className="muted">Manage catalog metadata, posters, publication state, and encoding status.</p>
+          <p className="muted">{status || "Manage catalog metadata, posters, publication state, and encoding status."}</p>
         </div>
         <button className="btn btn-primary">
           <Icon name="add" />
@@ -19,10 +34,10 @@ export default function AdminPage() {
       </div>
       <section className="kpi-grid">
         {[
-          ["Movies", "1,248"],
-          ["Series", "312"],
-          ["Pending", "18"],
-          ["Errors", "3"],
+          ["Movies", String(movies.length)],
+          ["Series", String(seriesCount)],
+          ["Pending", "0"],
+          ["Errors", "0"],
         ].map(([label, value]) => (
           <div className="kpi" key={label}>
             <span className="muted">{label}</span>
@@ -50,7 +65,7 @@ export default function AdminPage() {
           </thead>
           <tbody>
             {movies.map((movie) => (
-              <tr key={movie.title}>
+              <tr key={movie.id ?? movie.title}>
                 <td>{movie.title}</td>
                 <td>{movie.genre}</td>
                 <td>{movie.year}</td>

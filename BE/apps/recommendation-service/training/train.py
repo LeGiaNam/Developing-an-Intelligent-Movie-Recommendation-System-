@@ -222,7 +222,7 @@ def main():
     print("\n  Bước tiếp theo:")
     print("  1. Test thư viện:  python tests/test_recommender.py")
     print("  2. Chạy API:       uvicorn app.main:app --reload")
-    print("  3. Swagger UI:     http://127.0.0.1:8000/docs")
+    print("  3. Swagger UI:     http://127.0.0.1:8001/docs")
 
 
 if __name__ == "__main__":
