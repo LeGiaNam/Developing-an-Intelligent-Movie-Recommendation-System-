@@ -50,8 +50,8 @@ async function seedDatabase() {
 
   const passwordHash = await bcrypt.hash("Password@123", 12);
   const [admin, user] = await User.create([
-    { email: "admin@ipanmovie.local", passwordHash, status: "active", role: "admin", emailVerifiedAt: new Date() },
-    { email: "user@ipanmovie.local", passwordHash, status: "active", role: "user", emailVerifiedAt: new Date() },
+    { email: "admin@ipanmovie.local", passwordHash, status: "active", role: "admin" },
+    { email: "user@ipanmovie.local", passwordHash, status: "active", role: "user" },
   ]);
 
   const [adminProfile, mainProfile, kidsProfile] = await Profile.create([

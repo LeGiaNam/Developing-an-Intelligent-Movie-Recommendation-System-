@@ -34,6 +34,8 @@ RF_MODEL_PATH = MODEL_DIR / "rf_model.joblib"
 ENCODERS_PATH = MODEL_DIR / "encoders.joblib"
 MOVIES_PKL_PATH = MODEL_DIR / "movies.pkl"
 RATINGS_PKL_PATH = MODEL_DIR / "ratings.pkl"
+ID_MAP_PATH = MODEL_DIR / "id_map.json"
+MODEL_MANIFEST_PATH = MODEL_DIR / "model_manifest.json"
 
 MOVIES_CSV = DATA_DIR / "movies.csv"
 RATINGS_CSV = DATA_DIR / "ratings.csv"

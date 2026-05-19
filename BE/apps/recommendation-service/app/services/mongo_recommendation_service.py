@@ -1,4 +1,5 @@
 from functools import lru_cache
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from bson import ObjectId
@@ -48,6 +49,28 @@ def _movie_item(movie: dict, score: float | None = None) -> RecommendationItem:
         score=round(float(normalized_score), 4),
         title=movie.get("title"),
         genres="|".join(movie.get("genres") or []),
+    )
+
+
+def get_precomputed_items(key: str) -> list[RecommendationItem] | None:
+    document = _db().recommendation_snapshots.find_one({"key": key})
+    if not document:
+        return None
+    return [RecommendationItem(**item) for item in document.get("items", [])]
+
+
+def save_precomputed_items(key: str, items: list[RecommendationItem], algorithm: str = "mongo_heuristic") -> None:
+    _db().recommendation_snapshots.update_one(
+        {"key": key},
+        {
+            "$set": {
+                "key": key,
+                "items": [item.model_dump() for item in items],
+                "algorithm": algorithm,
+                "updatedAt": datetime.now(timezone.utc),
+            }
+        },
+        upsert=True,
     )
 
 
@@ -122,3 +145,30 @@ def get_mongo_personalized(profile_id: str, top_k: int = DEFAULT_LIMIT) -> list[
         results.append(_movie_item(movie, score=score))
 
     return sorted(results, key=lambda item: item.score, reverse=True)[:top_k]
+
+
+def precompute_all(limit: int = DEFAULT_LIMIT) -> dict:
+    db = _db()
+    movies = list(db.movies.find({"isDeleted": {"$ne": True}}, {"_id": 1}).limit(5000))
+    profiles = list(db.profiles.find({}, {"_id": 1}).limit(5000))
+
+    trending = get_mongo_trending(limit)
+    save_precomputed_items("recommendations:trending:global", trending)
+
+    similar_count = 0
+    for movie in movies:
+        movie_id = str(movie["_id"])
+        save_precomputed_items(f"recommendations:similar:{movie_id}", get_mongo_similar(movie_id, limit))
+        similar_count += 1
+
+    personalized_count = 0
+    for profile in profiles:
+        profile_id = str(profile["_id"])
+        save_precomputed_items(f"recommendations:personalized:{profile_id}", get_mongo_personalized(profile_id, limit))
+        personalized_count += 1
+
+    return {
+        "trending": len(trending),
+        "similar_snapshots": similar_count,
+        "personalized_snapshots": personalized_count,
+    }

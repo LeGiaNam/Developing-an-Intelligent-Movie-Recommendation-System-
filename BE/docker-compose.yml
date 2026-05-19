@@ -1,12 +1,4 @@
 services:
-  mongo:
-    image: mongo:7
-    container_name: ipanmovie-mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-
   redis:
     image: redis:7-alpine
     container_name: ipanmovie-redis
@@ -27,7 +19,6 @@ services:
     ports:
       - "4000:4000"
     depends_on:
-      - mongo
       - recommendation-service
 
   recommendation-service:
@@ -41,9 +32,7 @@ services:
     ports:
       - "8001:8001"
     depends_on:
-      - mongo
       - redis
 
 volumes:
-  mongo_data:
   redis_data:

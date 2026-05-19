@@ -35,6 +35,8 @@ export const env = {
   mongoDatabase: process.env.MONGODB_DATABASE ?? "",
   jwtSecret: process.env.JWT_SECRET ?? "change-me",
   recommendationServiceUrl: process.env.RECOMMENDATION_SERVICE_URL ?? "http://localhost:8001",
+  rateLimitMax: Number(process.env.API_RATE_LIMIT_MAX ?? 300),
+  rateLimitWindow: process.env.API_RATE_LIMIT_WINDOW ?? "1 minute",
 };
 
 
@@ -48,3 +50,5 @@ console.log(`MONGODB_APPNAME: ${env.mongoAppName}`);
 console.log(`MONGODB_DATABASE: ${env.mongoDatabase}`);
 console.log(`JWT_SECRET: ${env.jwtSecret}`);
 console.log(`RECOMMENDATION_SERVICE_URL: ${env.recommendationServiceUrl}`);
+console.log(`API_RATE_LIMIT_MAX: ${env.rateLimitMax}`);
+console.log(`API_RATE_LIMIT_WINDOW: ${env.rateLimitWindow}`);

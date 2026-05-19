@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
 import { Icon } from "@/components/Icon";
@@ -74,6 +75,23 @@ export default function HomePage() {
   const heroMovie = useMemo(() => catalog[1] ?? catalog[0] ?? null, [catalog]);
   const trendingMovies = trending.length ? trending : catalog;
   const featureMovie = trendingMovies[0] ?? null;
+
+  function trackRecommendationEvent(movie, eventType) {
+    if (!movie?.id) return;
+    api.trackRecommendationEvent({
+      profileId: getActiveProfileId(),
+      movieId: movie.id,
+      eventType,
+      variant: "recommendation",
+      source: "home_popup",
+      sessionId: typeof window !== "undefined" ? window.sessionStorage.getItem("ipanmovie.session") ?? "" : "",
+    }).catch(() => {});
+  }
+
+  useEffect(() => {
+    if (!recommendationPopupOpen || !recommended.length) return;
+    recommended.slice(0, 8).forEach((movie) => trackRecommendationEvent(movie, "impression"));
+  }, [recommendationPopupOpen, recommended]);
 
   return (
     <div className="app-shell">
@@ -154,13 +172,13 @@ export default function HomePage() {
             {recommendationPopupStatus ? <p className="muted">{recommendationPopupStatus}</p> : null}
             <div className="recommendation-grid">
               {recommended.slice(0, 8).map((movie) => (
-                <div className="recommendation-result" key={`popup-${movie.id}`}>
+                <Link className="recommendation-result" href={`/movie/${movie.id}`} key={`popup-${movie.id}`} onClick={() => trackRecommendationEvent(movie, "click")}>
                   {movie.image ? <Image src={movie.image} alt={`${movie.title} poster`} width={96} height={132} /> : <div className="recommendation-thumb" />}
                   <div>
                     <h3 className="card-title">{movie.title}</h3>
                     <p className="muted">{movie.genre} / {movie.year} / {movie.rating}</p>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

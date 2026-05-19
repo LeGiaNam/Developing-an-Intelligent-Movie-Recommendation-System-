@@ -51,7 +51,10 @@ async function request(path, options = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.success === false) {
     const message = payload.error?.message ?? `Request failed: ${response.status}`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.code = payload.error?.code;
+    error.details = payload.error?.details;
+    throw error;
   }
   return payload.data ?? payload;
 }
@@ -96,17 +99,17 @@ export const api = {
   async login(email, password) {
     return request("/auth/login", { method: "POST", body: { email, password }, token: null });
   },
-  async register(email, password) {
-    return request("/auth/register", { method: "POST", body: { email, password }, token: null });
-  },
-  async googleMockLogin() {
-    return request("/auth/google/mock", { token: null });
+  async register(email, password, profileName) {
+    return request("/auth/register", { method: "POST", body: { email, password, profileName }, token: null });
   },
   async me(token) {
     return request("/auth/me", { token });
   },
   async profiles(token) {
     return request("/profiles", { token });
+  },
+  async createProfile(profile, token) {
+    return request("/profiles", { method: "POST", body: profile, token });
   },
   async movies() {
     return request("/movies");
@@ -136,14 +139,39 @@ export const api = {
   async personalized(profileId, token) {
     return request(`/profiles/${profileId}/recommendations`, { token });
   },
+  async trackRecommendationEvent(event) {
+    return request("/recommendation-events", { method: "POST", body: event, token: null });
+  },
   async watchlist(profileId, token) {
     return request(`/profiles/${profileId}/watchlist`, { token });
+  },
+  async addToWatchlist(profileId, movieId, token) {
+    return request(`/profiles/${profileId}/watchlist/${movieId}`, { method: "POST", body: {}, token });
+  },
+  async removeFromWatchlist(profileId, movieId, token) {
+    return request(`/profiles/${profileId}/watchlist/${movieId}`, { method: "DELETE", token });
+  },
+  async rateMovie(profileId, movieId, score, token) {
+    return request(`/profiles/${profileId}/ratings/${movieId}`, { method: "PUT", body: { score }, token });
+  },
+  async updateHistory(profileId, movieId, progressSeconds, durationSeconds, token, episodeId = null) {
+    return request(`/profiles/${profileId}/history/${movieId}`, {
+      method: "PUT",
+      body: { episodeId, progressSeconds, durationSeconds },
+      token,
+    });
   },
   async history(profileId, token) {
     return request(`/profiles/${profileId}/history`, { token });
   },
+  async createMovie(movie, token) {
+    return request("/admin/movies", { method: "POST", body: movie, token });
+  },
   async adminUsers(token) {
     return request("/admin/users", { token });
+  },
+  async createAdminUser(user, token) {
+    return request("/admin/users", { method: "POST", body: user, token });
   },
   async updateUserStatus(userId, status, token) {
     return request(`/admin/users/${userId}/status`, { method: "PATCH", body: { status }, token });

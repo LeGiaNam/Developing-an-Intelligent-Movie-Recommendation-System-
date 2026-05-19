@@ -1,0 +1,61 @@
+movieId,mongoMovieId,title,genres
+1,6a0c12ca0ad81ce724530af8,Dune Walkers 1,Sci-Fi|Drama
+2,6a0c12ca0ad81ce724530af9,Neon Horizons 2,Action|Animation|Romance
+3,6a0c12ca0ad81ce724530afa,The Room Beyond 3,Thriller
+4,6a0c12ca0ad81ce724530afb,Neon Horizons 4,Comedy|Animation
+5,6a0c12ca0ad81ce724530afc,Dune Walkers 5,Romance
+6,6a0c12ca0ad81ce724530afd,The Room Beyond 6,Drama|Thriller|Comedy
+7,6a0c12ca0ad81ce724530afe,Realms of Valor 7,Romance|Thriller|Drama
+8,6a0c12ca0ad81ce724530aff,Realms of Valor 8,Romance|Documentary
+9,6a0c12ca0ad81ce724530b06,The Silent Protocol 15,Sci-Fi|Animation|Thriller
+10,6a0c12ca0ad81ce724530b0a,The Room Beyond 19,Action|Comedy|Sci-Fi
+11,6a0c12ca0ad81ce724530b09,Realms of Valor 18,Animation|Horror
+12,6a0c12ca0ad81ce724530b08,Realms of Valor 17,Action|Comedy
+13,6a0c12ca0ad81ce724530b07,The Silent Protocol 16,Action|Animation|Horror
+14,6a0c12ca0ad81ce724530b05,Dune Walkers 14,Horror
+15,6a0c12ca0ad81ce724530b04,alongside far affix when 13,Action|Thriller
+16,6a0c12ca0ad81ce724530b03,Neon Horizons 12,Comedy|Documentary|Action
+17,6a0c12ca0ad81ce724530b02,The Silent Protocol 11,Animation
+18,6a0c12ca0ad81ce724530b01,Dune Walkers 10,Romance|Documentary
+19,6a0c12ca0ad81ce724530b00,jade earn worthless 9,Animation|Thriller
+20,6a0c12ca0ad81ce724530b16,Dune Walkers 31,Animation|Documentary|Comedy
+21,6a0c12ca0ad81ce724530b1c,Realms of Valor 37,Comedy|Horror|Romance
+22,6a0c12ca0ad81ce724530b1b,The Room Beyond 36,Documentary
+23,6a0c12ca0ad81ce724530b1a,The Silent Protocol 35,Horror|Animation|Romance
+24,6a0c12ca0ad81ce724530b19,The Room Beyond 34,Animation|Horror|Romance
+25,6a0c12ca0ad81ce724530b18,The Room Beyond 33,Sci-Fi|Action|Drama
+26,6a0c12ca0ad81ce724530b17,The Silent Protocol 32,Action|Sci-Fi
+27,6a0c12ca0ad81ce724530b15,The Silent Protocol 30,Drama|Horror
+28,6a0c12ca0ad81ce724530b14,The Silent Protocol 29,Thriller|Comedy|Horror
+29,6a0c12ca0ad81ce724530b0b,The Silent Protocol 20,Sci-Fi
+30,6a0c12ca0ad81ce724530b13,Dune Walkers 28,Action
+31,6a0c12ca0ad81ce724530b0c,Neon Horizons 21,Thriller|Romance|Horror
+32,6a0c12ca0ad81ce724530b0d,Neon Horizons 22,Romance
+33,6a0c12ca0ad81ce724530b0e,The Silent Protocol 23,Documentary
+34,6a0c12ca0ad81ce724530b0f,Echoes of Eternity 24,Animation|Thriller|Horror
+35,6a0c12ca0ad81ce724530b10,The Silent Protocol 25,Documentary|Animation
+36,6a0c12ca0ad81ce724530b11,though gosh 26,Action|Sci-Fi|Thriller
+37,6a0c12ca0ad81ce724530b12,Neon Horizons 27,Documentary
+38,6a0c12ca0ad81ce724530b24,The Room Beyond 45,Thriller
+39,6a0c12ca0ad81ce724530b2b,Realms of Valor 52,Romance
+40,6a0c12ca0ad81ce724530b2a,Neon Horizons 51,Sci-Fi|Drama|Documentary
+41,6a0c12ca0ad81ce724530b29,Realms of Valor 50,Thriller
+42,6a0c12ca0ad81ce724530b28,The Room Beyond 49,Documentary
+43,6a0c12ca0ad81ce724530b27,Echoes of Eternity 48,Comedy|Horror
+44,6a0c12ca0ad81ce724530b26,huzzah unlike drink golden 47,Drama
+45,6a0c12ca0ad81ce724530b25,Echoes of Eternity 46,Action|Drama|Romance
+46,6a0c12ca0ad81ce724530b23,Neon Horizons 44,Action|Animation
+47,6a0c12ca0ad81ce724530b22,Realms of Valor 43,Documentary|Romance
+48,6a0c12ca0ad81ce724530b21,Realms of Valor 42,Thriller
+49,6a0c12ca0ad81ce724530b20,Dune Walkers 41,Horror
+50,6a0c12ca0ad81ce724530b1f,Dune Walkers 40,Thriller
+51,6a0c12ca0ad81ce724530b1e,The Room Beyond 39,Documentary|Sci-Fi
+52,6a0c12ca0ad81ce724530b1d,Echoes of Eternity 38,Comedy|Animation
+53,6a0c12ca0ad81ce724530b2c,Realms of Valor 53,Sci-Fi
+54,6a0c12ca0ad81ce724530b2d,Echoes of Eternity 54,Romance|Documentary|Comedy
+55,6a0c12ca0ad81ce724530b2e,The Room Beyond 55,Thriller|Romance
+56,6a0c12ca0ad81ce724530b2f,Echoes of Eternity 56,Animation|Horror
+57,6a0c12ca0ad81ce724530b30,betake now qua ethernet 57,Animation|Documentary
+58,6a0c12ca0ad81ce724530b31,blah until ritualise what 58,Documentary
+59,6a0c12ca0ad81ce724530b32,Realms of Valor 59,Drama
+60,6a0c12ca0ad81ce724530b33,The Silent Protocol 60,Drama

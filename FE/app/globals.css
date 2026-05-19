@@ -219,6 +219,28 @@ img {
   border: 2px solid rgba(255, 255, 255, 0.12);
 }
 
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 190px;
+  color: var(--text);
+}
+
+.profile-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.nav-auth-button {
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
 .hero {
   position: relative;
   min-height: min(870px, calc(100svh - 10px));
@@ -640,6 +662,53 @@ img {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(14, 14, 15, 0.78);
   backdrop-filter: blur(34px);
+}
+
+.auth-copy {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.password-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.password-checks span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.password-checks .app-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.password-checks span.passed {
+  color: #b7f7c8;
+  background: rgba(68, 207, 112, 0.12);
+}
+
+.link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .profile-grid {
