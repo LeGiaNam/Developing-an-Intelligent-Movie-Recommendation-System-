@@ -15,7 +15,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 def test_import():
     print("\n[test] 📦 Test import HybridMovieRecommender...")
-    from app.recommender import HybridMovieRecommender
+    from app.ml.recommender import HybridMovieRecommender
     print("  ✅ Import thành công!")
     return HybridMovieRecommender
 

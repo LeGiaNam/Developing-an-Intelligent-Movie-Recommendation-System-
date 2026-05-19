@@ -3,8 +3,10 @@ import Link from "next/link";
 import { Icon } from "./Icon";
 
 export function MovieCard({ movie, wide = false, progress }) {
+  const href = movie?.id ? `/movie/${movie.id}` : `/movie/${movie?.slug ?? "neon-horizons"}`;
+
   return (
-    <Link className={wide ? "wide-card" : "poster-card"} href="/movie/neon-horizons">
+    <Link className={wide ? "wide-card" : "poster-card"} href={href}>
       <Image src={movie.image} alt={`${movie.title} artwork`} fill sizes={wide ? "320px" : "220px"} />
       <span className="poster-play" aria-hidden="true">
         <Icon name="play_arrow" filled />
