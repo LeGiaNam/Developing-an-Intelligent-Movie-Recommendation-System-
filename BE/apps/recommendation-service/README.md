@@ -11,7 +11,10 @@ Neu chua co model trong `models/`, service van tra fallback nhe de moi truong de
 
 ## Chay local
 
+File `requirements.txt` chi gom dependency can de chay API. Cach nay tuong thich Python 3.12 va service van co fallback neu chua co model ML trong `models/`.
+
 ```bash
+python -m pip install -U pip setuptools wheel
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
@@ -19,6 +22,15 @@ uvicorn app.main:app --reload --port 8001
 Docs: `http://127.0.0.1:8001/docs`
 
 ## Train model
+
+Phan train model dung `requirements-ml.txt`. Tren Windows nen dung Python 3.11 vi `numpy`/`scikit-surprise` de loi build voi Python 3.12.
+
+```powershell
+py -3.11 -m venv .venv-ml
+.\.venv-ml\Scripts\Activate.ps1
+python -m pip install -U pip setuptools wheel
+pip install -r requirements-ml.txt
+```
 
 Dat cac file CSV vao `data/`:
 
@@ -34,6 +46,8 @@ python training/train.py
 ```
 
 Model se duoc luu vao `models/`.
+
+Neu `scikit-surprise` van fail khi install tren Windows, cai Microsoft C++ Build Tools hoac train bang Docker/WSL.
 
 Co the override duong dan bang bien moi truong:
 

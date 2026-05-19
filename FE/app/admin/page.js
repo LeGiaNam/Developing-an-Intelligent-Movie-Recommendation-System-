@@ -3,17 +3,27 @@
 import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/AdminShell";
 import { Icon } from "@/components/Icon";
-import { api, fallback, mapMovie } from "@/lib/api";
+import { getCachedMovies, loadMovies } from "@/lib/api";
 
 export default function AdminPage() {
-  const [movies, setMovies] = useState(fallback.movies);
-  const [status, setStatus] = useState("");
+  const [movies, setMovies] = useState([]);
+  const [status, setStatus] = useState("Loading catalog...");
 
   useEffect(() => {
-    api
-      .movies()
-      .then((items) => setMovies(items.map(mapMovie)))
-      .catch(() => setStatus("Backend unavailable. Showing mock catalog."));
+    const cached = getCachedMovies();
+    queueMicrotask(() => {
+      if (cached.length) {
+        setMovies(cached);
+        setStatus("");
+      }
+    });
+
+    loadMovies()
+      .then((items) => {
+        setMovies(items);
+        setStatus("");
+      })
+      .catch(() => setStatus(cached.length ? "" : "Backend unavailable. No catalog data loaded."));
   }, []);
 
   const seriesCount = movies.filter((movie) => movie.duration === "Series").length;

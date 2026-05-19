@@ -4,7 +4,7 @@ import { authenticate } from "../../common/middleware/auth.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { ok } from "../../common/utils/response.js";
 import { Profile } from "./profile.model.js";
-import { getPersonalizedMovies } from "../../integrations/recommendation/recommendation.client.js";
+import { getHydratedPersonalizedRecommendations } from "../../integrations/recommendation/recommendation.hydrator.js";
 
 export async function profileRoutes(app) {
   app.addHook("preHandler", authenticate);
@@ -69,6 +69,6 @@ export async function profileRoutes(app) {
     if (!profile) {
       throw new AppError(404, "PROFILE_NOT_FOUND", "Không tìm thấy profile");
     }
-    return ok(await getPersonalizedMovies(request.params.profileId));
+    return ok(await getHydratedPersonalizedRecommendations(request.params.profileId));
   });
 }

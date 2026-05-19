@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { images } from "@/lib/data";
 import { Icon } from "./Icon";
 
@@ -11,6 +15,15 @@ const links = [
 ];
 
 export function NavBar({ active = "/" }) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  function submitSearch(event) {
+    event.preventDefault();
+    const q = query.trim();
+    router.push(q ? `/browse?q=${encodeURIComponent(q)}` : "/browse");
+  }
+
   return (
     <nav className="top-nav">
       <div className="nav-left">
@@ -26,10 +39,12 @@ export function NavBar({ active = "/" }) {
         </div>
       </div>
       <div className="nav-right">
-        <label className="search-field">
-          <Icon name="search" />
-          <input placeholder="Search..." />
-        </label>
+        <form className="search-field" onSubmit={submitSearch}>
+          <button className="search-submit" type="submit" aria-label="Search movies">
+            <Icon name="search" />
+          </button>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search..." />
+        </form>
         <Link className="icon-button" href="/notifications" aria-label="Notifications">
           <Icon name="notifications" />
         </Link>

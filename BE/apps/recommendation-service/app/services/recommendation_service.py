@@ -7,6 +7,12 @@ from app.services.cache_service import (
     get_cached_recommendations,
     set_cached_recommendations,
 )
+from app.services.mongo_recommendation_service import (
+    get_mongo_personalized,
+    get_mongo_similar,
+    get_mongo_trending,
+    is_mongo_ready,
+)
 
 
 @lru_cache(maxsize=1)
@@ -21,6 +27,10 @@ def get_recommender():
 
 def is_model_loaded() -> bool:
     return get_recommender() is not None
+
+
+def is_mongo_loaded() -> bool:
+    return is_mongo_ready()
 
 
 def _to_item(item: dict) -> RecommendationItem:
@@ -98,11 +108,10 @@ def get_similar_movies(movie_id: str) -> list[RecommendationItem]:
             related = recommender.recommend_by_genres(genres=genres, top_k=11)
             items = [_to_item(item) for item in related if str(item.get("movieId")) != movie_id][:10]
     else:
-        items = [
-            RecommendationItem(movie_id=f"{movie_id}-similar-1", score=0.97),
-            RecommendationItem(movie_id=f"{movie_id}-similar-2", score=0.94),
-            RecommendationItem(movie_id=f"{movie_id}-similar-3", score=0.91),
-        ]
+        try:
+            items = get_mongo_similar(movie_id)
+        except Exception:
+            items = []
 
     set_cached_recommendations(cache_key, items)
     return items
@@ -124,11 +133,10 @@ def get_personalized_movies(profile_id: str) -> list[RecommendationItem]:
     elif get_recommender() is not None:
         items = [_to_item(item.model_dump()) for item in get_model_popular(top_k=10)]
     else:
-        items = [
-            RecommendationItem(movie_id=f"{profile_id}-for-you-1", score=0.99),
-            RecommendationItem(movie_id=f"{profile_id}-for-you-2", score=0.95),
-            RecommendationItem(movie_id=f"{profile_id}-for-you-3", score=0.92),
-        ]
+        try:
+            items = get_mongo_personalized(profile_id)
+        except Exception:
+            items = []
 
     set_cached_recommendations(cache_key, items)
     return items
@@ -143,11 +151,10 @@ def get_trending_movies() -> list[RecommendationItem]:
     if get_recommender() is not None:
         items = [_to_item(item.model_dump()) for item in get_model_popular(top_k=10)]
     else:
-        items = [
-            RecommendationItem(movie_id="trending-1", score=0.98),
-            RecommendationItem(movie_id="trending-2", score=0.96),
-            RecommendationItem(movie_id="trending-3", score=0.93),
-        ]
+        try:
+            items = get_mongo_trending()
+        except Exception:
+            items = []
 
     set_cached_recommendations(cache_key, items)
     return items

@@ -4,37 +4,43 @@ import { useEffect, useMemo, useState } from "react";
 import { MovieCard, MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
 import { Icon } from "@/components/Icon";
-import { api, fallback, mapMovie } from "@/lib/api";
-import { images } from "@/lib/data";
+import { getCachedMovies, loadMovies } from "@/lib/api";
 
 export default function MoviesPage() {
-  const [movies, setMovies] = useState(fallback.movies);
-  const [status, setStatus] = useState("");
+  const [movies, setMovies] = useState([]);
+  const [status, setStatus] = useState("Loading catalog...");
 
   useEffect(() => {
-    api
-      .movies()
+    const cached = getCachedMovies();
+    queueMicrotask(() => {
+      if (cached.length) {
+        setMovies(cached);
+        setStatus("");
+      }
+    });
+
+    loadMovies()
       .then((items) => {
-        setMovies(items.map(mapMovie));
+        setMovies(items);
         setStatus("");
       })
-      .catch(() => setStatus("Backend unavailable. Showing mock movies."));
+      .catch(() => setStatus(cached.length ? "" : "Backend unavailable. No catalog data loaded."));
   }, []);
 
-  const featured = useMemo(() => movies[0] ?? fallback.movies[0], [movies]);
+  const featured = useMemo(() => movies[0] ?? null, [movies]);
 
   return (
     <div className="app-shell">
       <NavBar active="/movies" />
-      <section className="hero" style={{ backgroundImage: `url(${featured.backdropUrl || images.moviesHero})` }}>
+      <section className="hero" style={{ backgroundImage: featured?.backdropUrl ? `url(${featured.backdropUrl})` : undefined }}>
         <div className="hero-content">
           <div className="eyebrow">
             <span>Featured Movie</span>
-            <span className="pill">{featured.genre}</span>
-            <span className="muted">Rating {featured.rating}</span>
+            {featured ? <span className="pill">{featured.genre}</span> : null}
+            {featured ? <span className="muted">Rating {featured.rating}</span> : null}
           </div>
-          <h1 className="title-xl">{featured.title}</h1>
-          <p className="lead">{featured.description || "A curated cinema wall powered by the backend catalog when available."}</p>
+          <h1 className="title-xl">{featured?.title ?? "Movies"}</h1>
+          <p className="lead">{featured?.description ?? "Connect the backend to load the live movie catalog."}</p>
           <div className="actions">
             <button className="btn btn-primary">
               <Icon name="play_arrow" filled />

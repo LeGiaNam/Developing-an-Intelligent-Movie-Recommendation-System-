@@ -19,11 +19,10 @@ services:
     build: ./apps/api
     container_name: ipanmovie-api
     env_file:
-      - ./apps/api/.env.example
+      - ./apps/api/.env
     volumes:
       - ./apps/api/src/scripts:/app/scripts
     environment:
-      MONGODB_URI: mongodb://mongo:27017/ipanmovie
       RECOMMENDATION_SERVICE_URL: http://recommendation-service:8001
     ports:
       - "4000:4000"
@@ -34,12 +33,15 @@ services:
   recommendation-service:
     build: ./apps/recommendation-service
     container_name: ipanmovie-rs
+    env_file:
+      - ./apps/api/.env
     environment:
       REDIS_URL: redis://redis:6379/0
       RECOMMENDATION_CACHE_TTL_SECONDS: 300
     ports:
       - "8001:8001"
     depends_on:
+      - mongo
       - redis
 
 volumes:

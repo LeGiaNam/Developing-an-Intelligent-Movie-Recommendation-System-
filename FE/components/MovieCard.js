@@ -3,11 +3,13 @@ import Link from "next/link";
 import { Icon } from "./Icon";
 
 export function MovieCard({ movie, wide = false, progress }) {
-  const href = movie?.id ? `/movie/${movie.id}` : `/movie/${movie?.slug ?? "neon-horizons"}`;
+  if (!movie) return null;
+
+  const href = movie.id ? `/movie/${movie.id}` : `/movie/${movie.slug ?? ""}`;
 
   return (
     <Link className={wide ? "wide-card" : "poster-card"} href={href}>
-      <Image src={movie.image} alt={`${movie.title} artwork`} fill sizes={wide ? "320px" : "220px"} />
+      {movie.image ? <Image src={movie.image} alt={`${movie.title} artwork`} fill sizes={wide ? "320px" : "220px"} /> : <div className="poster-fallback" />}
       <span className="poster-play" aria-hidden="true">
         <Icon name="play_arrow" filled />
       </span>
@@ -26,16 +28,20 @@ export function MovieCard({ movie, wide = false, progress }) {
   );
 }
 
-export function MovieRail({ title, movies, wide = false }) {
+export function MovieRail({ title, movies, wide = false, exploreHref = "/browse" }) {
+  if (!movies?.length) return null;
+
   return (
     <section className="section container">
       <div className="section-header">
         <h2 className="section-title">{title}</h2>
-        <span className="pill">Explore all</span>
+        <Link className="pill" href={exploreHref}>
+          Explore all
+        </Link>
       </div>
       <div className="rail">
         {movies.map((movie, index) => (
-          <MovieCard key={`${title}-${movie.title}`} movie={movie} wide={wide} progress={wide ? (index + 2) * 13 : undefined} />
+          <MovieCard key={`${title}-${movie.id ?? movie.title}`} movie={movie} wide={wide} progress={wide ? (index + 2) * 13 : undefined} />
         ))}
       </div>
     </section>

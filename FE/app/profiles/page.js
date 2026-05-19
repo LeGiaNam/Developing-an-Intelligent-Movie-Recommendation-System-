@@ -5,26 +5,32 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { api, fallback, mapProfile } from "@/lib/api";
+import { getCachedProfiles, loadProfiles } from "@/lib/api";
 import { clearToken, getToken, saveActiveProfileId } from "@/lib/auth";
 
 export default function ProfilesPage() {
   const router = useRouter();
-  const [profiles, setProfiles] = useState(fallback.profiles);
-  const [status, setStatus] = useState("Using demo profiles until backend auth is available.");
+  const [profiles, setProfiles] = useState([]);
+  const [status, setStatus] = useState("Sign in to load backend profiles.");
 
   useEffect(() => {
     const token = getToken();
     if (!token) return;
+    const cached = getCachedProfiles();
+    queueMicrotask(() => {
+      if (cached.length) {
+        setProfiles(cached);
+        setStatus("");
+      }
+    });
 
-    api
-      .me(token)
+    loadProfiles(token)
       .then((data) => {
-        setProfiles((data.profiles ?? []).map(mapProfile));
+        setProfiles(data.profiles ?? []);
         setStatus("");
       })
       .catch((error) => {
-        setStatus(`${error.message}. Showing mock profiles.`);
+        setStatus(cached.length ? "" : error.message);
       });
   }, []);
 
@@ -35,8 +41,8 @@ export default function ProfilesPage() {
 
   function logout() {
     clearToken();
-    setProfiles(fallback.profiles);
-    setStatus("Signed out. Showing mock profiles.");
+    setProfiles([]);
+    setStatus("Signed out.");
   }
 
   return (
@@ -52,7 +58,7 @@ export default function ProfilesPage() {
         <div className="profile-grid">
           {profiles.map((profile) => (
             <button className="profile-tile" type="button" onClick={() => selectProfile(profile.id)} key={profile.id}>
-              <Image src={profile.image} alt={`${profile.name} profile`} width={140} height={140} />
+              {profile.image ? <Image src={profile.image} alt={`${profile.name} profile`} width={140} height={140} /> : <span className="profile-placeholder">{profile.name.slice(0, 1)}</span>}
               <strong>{profile.name}</strong>
             </button>
           ))}

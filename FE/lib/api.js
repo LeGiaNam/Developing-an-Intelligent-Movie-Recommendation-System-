@@ -1,38 +1,36 @@
-import { movieImages, movies as mockMovies, profiles as mockProfiles } from "@/lib/data";
 import { getToken } from "@/lib/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const API_PREFIX = "/api/v1";
+const MOVIES_CACHE_KEY = "ipanmovie.movies";
+const PROFILE_CACHE_KEY = "ipanmovie.profiles";
 
-function imageForIndex(index = 0) {
-  return movieImages[index % movieImages.length];
-}
-
-export function mapMovie(movie, index = 0) {
-  if (!movie) return mockMovies[index % mockMovies.length];
+export function mapMovie(movie) {
+  if (!movie) return null;
+  const genres = Array.isArray(movie.genres) ? movie.genres : String(movie.genres ?? "").split("|").filter(Boolean);
   return {
     id: movie._id ?? movie.id ?? movie.movie_id ?? movie.movieId,
-    slug: movie.slug ?? "neon-horizons",
-    title: movie.title ?? `Movie ${index + 1}`,
-    genre: Array.isArray(movie.genres) ? movie.genres[0] ?? "Movie" : movie.genres ?? "Movie",
-    genres: Array.isArray(movie.genres) ? movie.genres : String(movie.genres ?? "Movie").split("|"),
+    slug: movie.slug,
+    title: movie.title ?? "Untitled",
+    genre: genres[0] ?? "Movie",
+    genres,
     year: movie.releaseYear ?? movie.year ?? "",
     rating: Number(movie.averageRating ?? movie.rating ?? movie.score ?? 0).toFixed(1),
     duration: movie.type === "series" ? "Series" : "Movie",
-    image: movie.posterUrl || movie.backdropUrl || imageForIndex(index),
-    backdropUrl: movie.backdropUrl || movie.posterUrl || imageForIndex(index + 1),
+    image: movie.posterUrl || movie.backdropUrl || "",
+    backdropUrl: movie.backdropUrl || movie.posterUrl || "",
     description: movie.description ?? "",
     raw: movie,
   };
 }
 
-export function mapProfile(profile, index = 0) {
-  const fallback = mockProfiles[index % mockProfiles.length];
+export function mapProfile(profile) {
+  if (!profile) return null;
   return {
-    id: profile?._id ?? profile?.id ?? fallback.name,
-    name: profile?.name ?? fallback.name,
-    image: profile?.avatarUrl || fallback.image,
-    isKids: Boolean(profile?.isKids),
+    id: profile._id ?? profile.id,
+    name: profile.name ?? "Profile",
+    image: profile.avatarUrl || "",
+    isKids: Boolean(profile.isKids),
     raw: profile,
   };
 }
@@ -58,6 +56,42 @@ async function request(path, options = {}) {
   return payload.data ?? payload;
 }
 
+function readCache(key, mapper) {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    return JSON.parse(raw).map(mapper).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function writeCache(key, items) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(items));
+}
+
+export function getCachedMovies() {
+  return readCache(MOVIES_CACHE_KEY, mapMovie);
+}
+
+export function getCachedProfiles() {
+  return readCache(PROFILE_CACHE_KEY, mapProfile);
+}
+
+export async function loadMovies() {
+  const items = await api.movies();
+  writeCache(MOVIES_CACHE_KEY, items);
+  return items.map(mapMovie).filter(Boolean);
+}
+
+export async function loadProfiles(token) {
+  const data = await api.me(token);
+  writeCache(PROFILE_CACHE_KEY, data.profiles ?? []);
+  return { ...data, profiles: (data.profiles ?? []).map(mapProfile).filter(Boolean) };
+}
+
 export const api = {
   async login(email, password) {
     return request("/auth/login", { method: "POST", body: { email, password }, token: null });
@@ -77,8 +111,20 @@ export const api = {
   async movies() {
     return request("/movies");
   },
+  async movie(movieId) {
+    return request(`/movies/${movieId}`);
+  },
+  async similarMovies(movieId) {
+    return request(`/movies/${movieId}/similar`);
+  },
+  async episodes(movieId) {
+    return request(`/movies/${movieId}/episodes`);
+  },
   async trending() {
     return request("/movies/discovery/trending");
+  },
+  async similar(movieId) {
+    return request(`/movies/${movieId}/similar`);
   },
   async searchMovies(params = {}) {
     const search = new URLSearchParams();
@@ -102,9 +148,4 @@ export const api = {
   async updateUserStatus(userId, status, token) {
     return request(`/admin/users/${userId}/status`, { method: "PATCH", body: { status }, token });
   },
-};
-
-export const fallback = {
-  movies: mockMovies,
-  profiles: mockProfiles.map(mapProfile),
 };
