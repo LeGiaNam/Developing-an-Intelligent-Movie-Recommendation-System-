@@ -1,5 +1,5 @@
 import dotenv from 'dotenv'
-dotenv.config({path : "../../.env"})
+dotenv.config({ path: "../../.env" })
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),
