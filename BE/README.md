@@ -27,6 +27,13 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
 
+Recommendation model/training da duoc dat trong `apps/recommendation-service`. Neu can train model, dat CSV vao `apps/recommendation-service/data` va chay:
+
+```bash
+cd apps/recommendation-service
+python training/train.py
+```
+
 Redis local mặc định:
 
 ```bash

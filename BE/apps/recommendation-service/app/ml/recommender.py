@@ -5,7 +5,7 @@ Thư viện chính của Hybrid Recommendation System.
 Có thể import và dùng độc lập mà không cần chạy FastAPI.
 
 Ví dụ sử dụng:
-    from app.recommender import HybridMovieRecommender
+    from app.ml.recommender import HybridMovieRecommender
 
     rec = HybridMovieRecommender()
     results = rec.recommend_for_user(
@@ -25,7 +25,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from app.config import (
+from app.core.config import (
     SVD_MODEL_PATH,
     RF_MODEL_PATH,
     ENCODERS_PATH,
