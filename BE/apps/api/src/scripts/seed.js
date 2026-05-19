@@ -84,9 +84,8 @@ const SearchLog = mongoose.model('SearchLog', searchLogSchema);
 
 async function seedDatabase() {
   try {
-    console.log('Connecting to MongoDB...');
-    await connectDatabase();
-    console.log('Connected successfully!');
+    const connection = await connectDatabase();
+    if (!connection) process.exit(1);
 
     // Cleanup Step
     console.log('Cleaning up existing data...');
@@ -97,7 +96,7 @@ async function seedDatabase() {
     await Rating.deleteMany({});
     await SearchLog.deleteMany({});
     console.log('Cleanup completed.');
- 
+
     // Arrays to hold mock data
     const users = [];
     const profiles = [];
