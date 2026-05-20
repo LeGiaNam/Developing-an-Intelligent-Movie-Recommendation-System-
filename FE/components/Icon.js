@@ -10,6 +10,7 @@ import {
   Lock,
   LockOpen,
   LogIn,
+  LogOut,
   Mail,
   MonitorPlay,
   Play,
@@ -18,6 +19,7 @@ import {
   Settings,
   SlidersHorizontal,
   ThumbsUp,
+  Trash2,
   UserPlus,
   Users,
   X,
@@ -37,6 +39,7 @@ const icons = {
   lock: Lock,
   lock_open: LockOpen,
   login: LogIn,
+  logout: LogOut,
   mail: Mail,
   movie: Clapperboard,
   notifications: Bell,
@@ -45,6 +48,7 @@ const icons = {
   search: Search,
   settings: Settings,
   thumb_up: ThumbsUp,
+  delete: Trash2,
   tune: SlidersHorizontal,
 };
 

@@ -39,7 +39,7 @@ npm run seed
 
 Demo accounts:
 
-- Admin: `admin@ipanmovie.local` / `Password@123`
+- Admin: `admin@gmail.com` / `Admin@123`
 - User: `user@ipanmovie.local` / `Password@123`
 
 ## Auth

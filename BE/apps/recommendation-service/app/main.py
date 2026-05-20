@@ -7,6 +7,7 @@ from app.api.routes import router
 from app.services.recommendation_service import is_model_loaded, is_mongo_loaded
 from app.services.model_registry import model_readiness
 from app.services.metrics_service import increment, observe_latency, snapshot
+from app.services.cache_service import cache_snapshot, is_redis_ready
 
 app = FastAPI(title="IPANMOVIE Recommendation Service", version="1.0.0")
 app.include_router(router, prefix="/v1")
@@ -37,6 +38,7 @@ def health() -> dict[str, str | bool]:
         "status": "ok",
         "model_loaded": is_model_loaded(),
         "mongo_loaded": is_mongo_loaded(),
+        "redis_loaded": is_redis_ready(),
     }
 
 
@@ -44,8 +46,9 @@ def health() -> dict[str, str | bool]:
 def readiness() -> dict:
     readiness_state = model_readiness()
     return {
-        "status": "ok" if is_mongo_loaded() else "degraded",
+        "status": "ok" if is_mongo_loaded() and is_redis_ready() else "degraded",
         "mongo_loaded": is_mongo_loaded(),
+        "redis": cache_snapshot(),
         "model_loaded": is_model_loaded(),
         "serving_mode": "hybrid_ml" if is_model_loaded() else "mongo_heuristic",
         "model": readiness_state,

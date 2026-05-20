@@ -9,6 +9,9 @@ dotenv.config();
 function buildMongoUri() {
   const directUri = process.env.MONGO_URI ?? process.env.MONGODB_URI;
   if (directUri) {
+    if (isLocalMongoUri(directUri)) {
+      throw new Error("MongoDB local URLs are not allowed. Configure MongoDB Atlas instead.");
+    }
     return directUri;
   }
 
@@ -22,7 +25,11 @@ function buildMongoUri() {
     return `mongodb+srv://${user}:${encodedPassword}@${cluster}/${database}${appName}`;
   }
 
-  return "mongodb://localhost:27017/ipanmovie";
+  throw new Error("MongoDB Atlas configuration is required. Set MONGODB_URI or MONGODB_CLUSTER/MONGODB_USER/MONGODB_PASSWORD/MONGODB_DATABASE.");
+}
+
+function isLocalMongoUri(uri) {
+  return /mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0|host\.docker\.internal)(?::|\/|$)/i.test(uri);
 }
 
 export const env = {
@@ -38,17 +45,3 @@ export const env = {
   rateLimitMax: Number(process.env.API_RATE_LIMIT_MAX ?? 300),
   rateLimitWindow: process.env.API_RATE_LIMIT_WINDOW ?? "1 minute",
 };
-
-
-console.log("Environment Variables:");
-console.log(`PORT: ${env.port}`);
-console.log(`MONGO_URI: ${env.mongoUri}`);
-console.log(`MONGODB_CLUSTER: ${env.mongoCluster}`);
-console.log(`MONGODB_USER: ${env.mongoUser}`);
-console.log(`MONGODB_PASSWORD: ${env.mongoPassword ? "***" : ""}`);
-console.log(`MONGODB_APPNAME: ${env.mongoAppName}`);
-console.log(`MONGODB_DATABASE: ${env.mongoDatabase}`);
-console.log(`JWT_SECRET: ${env.jwtSecret}`);
-console.log(`RECOMMENDATION_SERVICE_URL: ${env.recommendationServiceUrl}`);
-console.log(`API_RATE_LIMIT_MAX: ${env.rateLimitMax}`);
-console.log(`API_RATE_LIMIT_WINDOW: ${env.rateLimitWindow}`);

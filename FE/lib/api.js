@@ -105,11 +105,23 @@ export const api = {
   async me(token) {
     return request("/auth/me", { token });
   },
+  async changePassword(currentPassword, newPassword, token) {
+    return request("/auth/me/password", { method: "PATCH", body: { currentPassword, newPassword }, token });
+  },
   async profiles(token) {
     return request("/profiles", { token });
   },
   async createProfile(profile, token) {
     return request("/profiles", { method: "POST", body: profile, token });
+  },
+  async updateProfile(profileId, profile, token) {
+    return request(`/profiles/${profileId}`, { method: "PATCH", body: profile, token });
+  },
+  async deleteProfile(profileId, token) {
+    return request(`/profiles/${profileId}`, { method: "DELETE", token });
+  },
+  async verifyProfilePin(profileId, pin, token) {
+    return request(`/profiles/${profileId}/verify-pin`, { method: "POST", body: { pin }, token });
   },
   async movies() {
     return request("/movies");
@@ -135,6 +147,9 @@ export const api = {
       if (value) search.set(key, value);
     });
     return request(`/search/movies?${search.toString()}`);
+  },
+  async searchSuggest(q) {
+    return request(`/search/suggest?q=${encodeURIComponent(q)}`);
   },
   async personalized(profileId, token) {
     return request(`/profiles/${profileId}/recommendations`, { token });
@@ -164,8 +179,26 @@ export const api = {
   async history(profileId, token) {
     return request(`/profiles/${profileId}/history`, { token });
   },
+  async comments(movieId, limit = 10) {
+    return request(`/movies/${movieId}/comments?limit=${limit}`);
+  },
+  async addComment(movieId, profileId, content, token) {
+    return request(`/movies/${movieId}/comments`, { method: "POST", body: { profileId, content }, token });
+  },
+  async replyComment(commentId, movieId, profileId, content, token) {
+    return request(`/comments/${commentId}/replies`, { method: "POST", body: { movieId, profileId, content }, token });
+  },
   async createMovie(movie, token) {
     return request("/admin/movies", { method: "POST", body: movie, token });
+  },
+  async updateMovie(movieId, movie, token) {
+    return request(`/admin/movies/${movieId}`, { method: "PATCH", body: movie, token });
+  },
+  async deleteMovie(movieId, token) {
+    return request(`/admin/movies/${movieId}`, { method: "DELETE", token });
+  },
+  async createEpisode(movieId, episode, token) {
+    return request(`/admin/movies/${movieId}/episodes`, { method: "POST", body: episode, token });
   },
   async adminUsers(token) {
     return request("/admin/users", { token });
@@ -175,5 +208,8 @@ export const api = {
   },
   async updateUserStatus(userId, status, token) {
     return request(`/admin/users/${userId}/status`, { method: "PATCH", body: { status }, token });
+  },
+  async recommendationSummary(token) {
+    return request("/recommendation-events/summary", { token });
   },
 };

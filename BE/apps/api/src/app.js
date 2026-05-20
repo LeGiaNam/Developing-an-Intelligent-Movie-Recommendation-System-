@@ -19,7 +19,11 @@ import { recommendationEventRoutes } from "./modules/recommendation-events/recom
 export async function buildApp() {
   const app = Fastify({ logger: true });
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    origin: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  });
   await app.register(helmet);
   await app.register(rateLimit, {
     max: env.rateLimitMax,

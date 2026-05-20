@@ -27,6 +27,8 @@ def load_env_file(path: Path) -> None:
 def build_mongo_uri() -> str:
     direct_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI")
     if direct_uri:
+        if is_local_mongo_uri(direct_uri):
+            raise ValueError("MongoDB local URLs are not allowed. Configure MongoDB Atlas instead.")
         return direct_uri
 
     cluster = os.getenv("MONGODB_CLUSTER")
@@ -38,7 +40,16 @@ def build_mongo_uri() -> str:
         query = f"?appName={quote_plus(app_name)}" if app_name else ""
         return f"mongodb+srv://{quote_plus(user)}:{quote_plus(password)}@{cluster}/{database}{query}"
 
-    return "mongodb://localhost:27017/ipanmovie"
+    raise ValueError(
+        "MongoDB Atlas configuration is required. Set MONGODB_URI or "
+        "MONGODB_CLUSTER/MONGODB_USER/MONGODB_PASSWORD/MONGODB_DATABASE."
+    )
+
+
+def is_local_mongo_uri(uri: str) -> bool:
+    lowered = uri.lower()
+    local_hosts = ("localhost", "127.0.0.1", "0.0.0.0", "host.docker.internal")
+    return any(f"//{host}" in lowered or f"@{host}" in lowered for host in local_hosts)
 
 
 def database_name(uri: str) -> str:
