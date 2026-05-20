@@ -185,5 +185,13 @@ def invalidate_profile_recommendations(profile_id: str) -> None:
     delete_cache_key(f"recommendations:personalized:{profile_id}")
 
 
+def invalidate_similar_recommendations(movie_id: str) -> None:
+    delete_cache_key(f"recommendations:similar:{movie_id}")
+
+
 def invalidate_trending_recommendations() -> None:
     delete_cache_pattern("recommendations:trending:*")
+
+
+def invalidate_all_recommendations() -> None:
+    delete_cache_pattern("recommendations:*")

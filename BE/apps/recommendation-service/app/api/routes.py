@@ -10,6 +10,7 @@ from app.schemas.recommendation import (
     RecommendationResponse,
 )
 from app.services.recommendation_service import (
+    invalidate_all_recommendations,
     get_model_genre_recommendations,
     get_model_popular,
     get_model_recommendations,
@@ -17,8 +18,10 @@ from app.services.recommendation_service import (
     get_similar_movies,
     get_trending_movies,
     invalidate_profile_recommendations,
+    invalidate_similar_recommendations,
     invalidate_trending_recommendations,
 )
+from app.services.cache_service import cache_snapshot
 
 router = APIRouter()
 
@@ -73,7 +76,24 @@ def invalidate_profile_cache(profile_id: str) -> dict[str, bool]:
     return {"invalidated": True}
 
 
+@router.post("/cache/invalidate/similar/{movie_id}")
+def invalidate_similar_cache(movie_id: str) -> dict[str, bool]:
+    invalidate_similar_recommendations(movie_id)
+    return {"invalidated": True}
+
+
 @router.post("/cache/invalidate/trending")
 def invalidate_trending_cache() -> dict[str, bool]:
     invalidate_trending_recommendations()
     return {"invalidated": True}
+
+
+@router.post("/cache/invalidate/all")
+def invalidate_all_cache() -> dict[str, bool]:
+    invalidate_all_recommendations()
+    return {"invalidated": True}
+
+
+@router.get("/cache/status")
+def cache_status() -> dict:
+    return cache_snapshot()

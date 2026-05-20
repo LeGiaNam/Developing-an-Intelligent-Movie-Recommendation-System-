@@ -8,6 +8,11 @@ import { User } from "../auth/user.model.js";
 import { Profile } from "../profiles/profile.model.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { normalizeText } from "../../common/utils/normalizeText.js";
+import {
+  invalidateAllRecommendations,
+  invalidateSimilarRecommendations,
+  invalidateTrendingRecommendations,
+} from "../../integrations/recommendation/recommendation.client.js";
 
 const passwordSchema = z
   .string()
@@ -47,17 +52,37 @@ export async function adminRoutes(app) {
     }).parse(request.body);
 
     const movie = await Movie.create({ ...input, normalizedTitle: normalizeText(input.title) });
+    await invalidateTrendingRecommendations();
     reply.code(201);
     return ok(movie);
   });
 
   app.patch("/movies/:movieId", async (request) => {
-    const movie = await Movie.findByIdAndUpdate(request.params.movieId, request.body, { new: true });
+    const input = z.object({
+      title: z.string().optional(),
+      slug: z.string().optional(),
+      description: z.string().optional(),
+      type: z.enum(["movie", "series"]).optional(),
+      genres: z.array(z.string()).optional(),
+      countries: z.array(z.string()).optional(),
+      releaseYear: z.number().int().optional(),
+      posterUrl: z.string().url().optional(),
+      backdropUrl: z.string().url().optional(),
+      trailerUrl: z.string().url().optional(),
+      videoSources: z.array(z.object({ quality: z.string(), url: z.string().url() })).optional(),
+    }).parse(request.body);
+    const update = input.title ? { ...input, normalizedTitle: normalizeText(input.title) } : input;
+    const movie = await Movie.findByIdAndUpdate(request.params.movieId, update, { new: true });
+    await Promise.all([
+      invalidateSimilarRecommendations(request.params.movieId),
+      invalidateTrendingRecommendations(),
+    ]);
     return ok(movie);
   });
 
   app.delete("/movies/:movieId", async (request) => {
     await Movie.findByIdAndUpdate(request.params.movieId, { isDeleted: true });
+    await invalidateAllRecommendations();
     return ok({ deleted: true });
   });
 

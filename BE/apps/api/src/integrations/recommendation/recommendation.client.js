@@ -40,9 +40,29 @@ export async function invalidateProfileRecommendations(profileId) {
   }
 }
 
+export async function invalidateSimilarRecommendations(movieId) {
+  try {
+    await fetch(`${env.recommendationServiceUrl}/v1/cache/invalidate/similar/${movieId}`, {
+      method: "POST",
+    });
+  } catch {
+    return;
+  }
+}
+
 export async function invalidateTrendingRecommendations() {
   try {
     await fetch(`${env.recommendationServiceUrl}/v1/cache/invalidate/trending`, {
+      method: "POST",
+    });
+  } catch {
+    return;
+  }
+}
+
+export async function invalidateAllRecommendations() {
+  try {
+    await fetch(`${env.recommendationServiceUrl}/v1/cache/invalidate/all`, {
       method: "POST",
     });
   } catch {

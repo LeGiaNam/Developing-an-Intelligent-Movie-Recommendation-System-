@@ -48,10 +48,11 @@ async function seedDatabase() {
   ]);
   console.log("Cleanup completed.");
 
-  const passwordHash = await bcrypt.hash("Password@123", 12);
+  const adminPasswordHash = await bcrypt.hash("Admin@123", 12);
+  const userPasswordHash = await bcrypt.hash("Password@123", 12);
   const [admin, user] = await User.create([
-    { email: "admin@ipanmovie.local", passwordHash, status: "active", role: "admin" },
-    { email: "user@ipanmovie.local", passwordHash, status: "active", role: "user" },
+    { email: "admin@gmail.com", passwordHash: adminPasswordHash, status: "active", role: "admin" },
+    { email: "user@ipanmovie.local", passwordHash: userPasswordHash, status: "active", role: "user" },
   ]);
 
   const [adminProfile, mainProfile, kidsProfile] = await Profile.create([
@@ -148,7 +149,7 @@ async function seedDatabase() {
 
   console.log("Database seeding completed successfully!");
   console.log({
-    admin: "admin@ipanmovie.local / Password@123",
+    admin: "admin@gmail.com / Admin@123",
     user: "user@ipanmovie.local / Password@123",
     movies: movies.length,
     profiles: 3,

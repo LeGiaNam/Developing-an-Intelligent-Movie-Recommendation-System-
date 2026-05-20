@@ -1,5 +1,11 @@
+import { AppError } from "../errors/AppError.js";
+
 export async function authenticate(request) {
-  await request.jwtVerify();
+  try {
+    await request.jwtVerify();
+  } catch {
+    throw new AppError(401, "UNAUTHORIZED", "Authentication required");
+  }
 }
 
 export async function requireAdmin(request) {

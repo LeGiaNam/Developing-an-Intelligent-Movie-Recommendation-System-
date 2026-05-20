@@ -12,6 +12,10 @@ export default function UserProfilePage() {
   const [profile, setProfile] = useState(null);
   const [user, setUser] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
+  const [displayName, setDisplayName] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
   const [status, setStatus] = useState("Sign in to load backend profile data.");
 
   useEffect(() => {
@@ -26,6 +30,7 @@ export default function UserProfilePage() {
         if (selected) {
           const mappedProfile = mapProfile(selected);
           setProfile(mappedProfile);
+          setDisplayName(mappedProfile.name);
           const items = await api.watchlist(mappedProfile.id, token).catch(() => []);
           setWatchlist(items.map((item) => mapMovie(item.movieId ?? item)).filter(Boolean));
         }
@@ -34,6 +39,35 @@ export default function UserProfilePage() {
       })
       .catch((error) => setStatus(error.message));
   }, []);
+
+  async function saveChanges() {
+    const token = getToken();
+    if (!token || !profile?.id) {
+      setStatus("Sign in and choose a profile first.");
+      return;
+    }
+
+    setSavingProfile(true);
+    setStatus("");
+    try {
+      if (displayName.trim() && displayName.trim() !== profile.name) {
+        const updated = await api.updateProfile(profile.id, { name: displayName.trim() }, token);
+        const mapped = mapProfile(updated);
+        setProfile(mapped);
+        setDisplayName(mapped.name);
+      }
+      if (currentPassword || newPassword) {
+        await api.changePassword(currentPassword, newPassword, token);
+        setCurrentPassword("");
+        setNewPassword("");
+      }
+      setStatus("Changes saved.");
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setSavingProfile(false);
+    }
+  }
 
   return (
     <div className="app-shell profile-page">
@@ -54,7 +88,7 @@ export default function UserProfilePage() {
             <div className="form-grid">
               <label className="field-label">
                 Display name
-                <input className="field" value={profile?.name ?? ""} readOnly />
+                <input className="field" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
               </label>
               <label className="field-label">
                 Email
@@ -63,12 +97,18 @@ export default function UserProfilePage() {
             </div>
             <h2 className="section-title">Change Password</h2>
             <div className="form-grid">
-              <input className="field" placeholder="Current password" type="password" />
-              <input className="field" placeholder="New password" type="password" />
+              <input className="field" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} placeholder="Current password" type="password" />
+              <input className="field" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="New password" type="password" />
             </div>
             <div className="actions">
-              <button className="btn btn-ghost">Cancel</button>
-              <button className="btn btn-primary">Save Changes</button>
+              <button className="btn btn-ghost" type="button" onClick={() => {
+                setDisplayName(profile?.name ?? "");
+                setCurrentPassword("");
+                setNewPassword("");
+              }}>Cancel</button>
+              <button className="btn btn-primary" disabled={savingProfile} onClick={saveChanges} type="button">
+                {savingProfile ? "Saving..." : "Save Changes"}
+              </button>
             </div>
           </section>
           <aside className="glass-panel filter-stack">

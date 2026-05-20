@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
@@ -8,12 +9,40 @@ import { Icon } from "@/components/Icon";
 import { api, getCachedMovies, mapMovie } from "@/lib/api";
 import { getActiveProfileId, getToken } from "@/lib/auth";
 
+function formatDate(value) {
+  if (!value) return "Just now";
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
+function profileName(profile) {
+  return profile?.name ?? "IPANMOVIE viewer";
+}
+
+function sourceIsPlayable(source) {
+  return Boolean(source?.url && !source.url.includes("example.com"));
+}
+
+function bestPlayableSource(sources = []) {
+  return sources.find(sourceIsPlayable);
+}
+
+function durationLabel(seconds) {
+  if (!seconds) return "Duration pending";
+  return `${Math.max(Math.round(seconds / 60), 1)} min`;
+}
+
 export default function MovieDetailsPage() {
   const { movieId } = useParams();
   const [cachedMovies, setCachedMovies] = useState([]);
   const [movie, setMovie] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [similarMovies, setSimilarMovies] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState("");
+  const [ratingScore, setRatingScore] = useState(5);
+  const [userRating, setUserRating] = useState(null);
+  const [showPlayer, setShowPlayer] = useState(false);
+  const [selectedEpisode, setSelectedEpisode] = useState(null);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -44,11 +73,26 @@ export default function MovieDetailsPage() {
       .similar(movieId)
       .then((items) => setSimilarMovies(items.map(mapMovie).filter(Boolean)))
       .catch(() => setSimilarMovies([]));
+
+    api
+      .comments(movieId)
+      .then(setComments)
+      .catch(() => setComments([]));
   }, [movieId]);
 
   const similar = similarMovies.length ? similarMovies : cachedMovies.filter((item) => item.id !== movie?.id).slice(0, 10);
   const cast = movie?.raw?.cast ?? movie?.raw?.casts ?? [];
   const directors = movie?.raw?.directors ?? [];
+  const countries = movie?.raw?.countries ?? [];
+  const videoSources = movie?.raw?.videoSources ?? [];
+  const isSeries = movie?.raw?.type === "series" || movie?.duration === "Series";
+  const activeSources = selectedEpisode ? selectedEpisode.videoSources ?? [] : videoSources;
+  const playableSource = bestPlayableSource(activeSources);
+  const playerTitle = selectedEpisode
+    ? `${movie?.title ?? "Series"} - S${selectedEpisode.seasonNumber ?? 1}:E${selectedEpisode.episodeNumber ?? 1} ${selectedEpisode.title ?? ""}`.trim()
+    : movie?.title ?? "Movie";
+  const trailerUrl = movie?.raw?.trailerUrl ?? "";
+  const hasPlaybackSource = Boolean(playableSource?.url);
 
   async function runProfileAction(action) {
     const token = getToken();
@@ -78,16 +122,60 @@ export default function MovieDetailsPage() {
 
   function rateMovie() {
     runProfileAction(async (profileId, movieIdValue, token) => {
-      await api.rateMovie(profileId, movieIdValue, 5, token);
-      setStatus("Rated 5 stars.");
+      await api.rateMovie(profileId, movieIdValue, ratingScore, token);
+      setUserRating(ratingScore);
+      setMovie((current) => current ? {
+        ...current,
+        rating: ratingScore.toFixed(1),
+        raw: { ...current.raw, averageRating: ratingScore },
+      } : current);
+      setStatus(`Rated ${ratingScore} stars.`);
     });
   }
 
-  function markPlaybackStarted() {
-    runProfileAction(async (profileId, movieIdValue, token) => {
-      await api.updateHistory(profileId, movieIdValue, 60, 3600, token);
-      setStatus("Playback saved to your watch history.");
-    });
+  async function openPlayer(episode = null) {
+    const targetEpisode = episode ?? (isSeries ? episodes[0] ?? null : null);
+    setSelectedEpisode(targetEpisode);
+    setShowPlayer(true);
+    const token = getToken();
+    const profileId = getActiveProfileId();
+    if (!token || !profileId || !movie?.id) {
+      if (isSeries && !targetEpisode) {
+        setStatus("This series does not have episodes yet.");
+      }
+      return;
+    }
+
+    try {
+      const durationSeconds = targetEpisode?.durationSeconds ?? movie?.raw?.durationSeconds ?? 3600;
+      await api.updateHistory(profileId, movie.id, 60, durationSeconds, token, targetEpisode?._id ?? null);
+      setStatus(targetEpisode ? `Playback started: ${targetEpisode.title ?? "Episode"}.` : hasPlaybackSource ? "Playback started." : "Added to your watch history.");
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function submitComment(event) {
+    event.preventDefault();
+    const token = getToken();
+    const profileId = getActiveProfileId();
+    const content = commentText.trim();
+    if (!token || !profileId) {
+      setStatus("Sign in and choose a profile before commenting.");
+      return;
+    }
+    if (!content || !movie?.id) {
+      return;
+    }
+
+    try {
+      const created = await api.addComment(movie.id, profileId, content, token);
+      setComments((current) => [created, ...current].slice(0, 10));
+      setCommentText("");
+      setStatus("Comment posted.");
+    } catch (error) {
+      setStatus(error.message);
+    }
   }
 
   return (
@@ -103,18 +191,32 @@ export default function MovieDetailsPage() {
           <h1 className="title-xl">{movie?.title ?? "Movie"}</h1>
           <p className="lead">{movie?.description ?? "Loading movie metadata from the backend catalog."}</p>
           <div className="actions">
-            <button className="btn btn-primary" onClick={markPlaybackStarted} type="button">
+            <button className="btn btn-primary" onClick={() => openPlayer()} type="button">
               <Icon name="play_arrow" filled />
-              Play
+              {isSeries ? "Play Episode 1" : "Play"}
             </button>
             <button className="btn btn-ghost" onClick={addToMyList} type="button">
               <Icon name="add" />
               My List
             </button>
-            <button className="btn btn-ghost" onClick={rateMovie} type="button">
-              <Icon name="thumb_up" />
-              Rate
-            </button>
+            <div className="rating-control" aria-label="Rate movie">
+              {[1, 2, 3, 4, 5].map((score) => (
+                <button
+                  className={`rating-star ${ratingScore >= score ? "active" : ""}`}
+                  key={score}
+                  onClick={() => setRatingScore(score)}
+                  type="button"
+                  aria-label={`Choose ${score} stars`}
+                >
+                  <span aria-hidden="true">★</span>
+                </button>
+              ))}
+              <span className="rating-value">{ratingScore}/5</span>
+              <button className="btn btn-ghost" onClick={rateMovie} type="button">
+                <Icon name="thumb_up" />
+                {userRating ? "Rated" : "Rate"}
+              </button>
+            </div>
           </div>
           {status ? <p className="muted">{status}</p> : null}
         </div>
@@ -134,18 +236,19 @@ export default function MovieDetailsPage() {
               {cast.length === 0 && directors.length === 0 ? <span className="pill">Updating metadata</span> : null}
             </div>
           </div>
-          <div className="glass-panel">
+          <div className="glass-panel metadata-panel">
             <h2 className="section-title">Metadata</h2>
-            <div className="metadata-grid">
+            <div className="metadata-grid detail-metadata">
               {[
-                ["Rating", movie?.rating ?? "N/A"],
-                ["Type", movie?.duration ?? "N/A"],
-                ["Year", movie?.year || "N/A"],
-                ["Episodes", episodes.length || "N/A"],
-              ].map(([label, value]) => (
+                ["Rating", movie?.rating ?? "N/A", `${movie?.raw?.ratingCount ?? 0} votes`],
+                ["Format", movie?.duration ?? "N/A", movie?.raw?.ageRating ?? "All viewers"],
+                ["Release", movie?.year || "N/A", countries.join(", ") || "Global"],
+                ["Episodes", isSeries ? episodes.length || "N/A" : "N/A", isSeries ? `${episodes.length} listed` : videoSources.length ? `${videoSources.length} sources` : "No stream"],
+              ].map(([label, value, detail]) => (
                 <div className="meta-box" key={label}>
-                  <span className="muted">{label}</span>
+                  <span className="meta-label">{label}</span>
                   <strong>{value}</strong>
+                  <span className="muted">{detail}</span>
                 </div>
               ))}
             </div>
@@ -155,7 +258,103 @@ export default function MovieDetailsPage() {
           <h2 className="section-title">Community Resonance</h2>
           <p className="muted">Viewers are rating this {movie?.rating ?? "N/A"} in the seeded catalog.</p>
         </section>
+        {isSeries ? (
+          <section className="section glass-panel">
+            <div className="section-header">
+              <h2 className="section-title">Episodes</h2>
+              <span className="pill">{episodes.length}</span>
+            </div>
+            <div className="episode-list">
+              {episodes.map((episode) => {
+                const hasEpisodeSource = Boolean(bestPlayableSource(episode.videoSources ?? []));
+                return (
+                  <button className="episode-row" key={episode._id ?? `${episode.seasonNumber}-${episode.episodeNumber}`} onClick={() => openPlayer(episode)} type="button">
+                    <span className="episode-number">S{episode.seasonNumber ?? 1}:E{episode.episodeNumber ?? 1}</span>
+                    <span className="episode-copy">
+                      <strong>{episode.title ?? `Episode ${episode.episodeNumber ?? ""}`}</strong>
+                      <span className="muted">{durationLabel(episode.durationSeconds)} / {hasEpisodeSource ? `${episode.videoSources?.length ?? 1} source` : "Source pending"}</span>
+                    </span>
+                    <span className="episode-play">
+                      <Icon name="play_arrow" filled />
+                    </span>
+                  </button>
+                );
+              })}
+              {episodes.length === 0 ? <p className="muted">No episodes published yet.</p> : null}
+            </div>
+          </section>
+        ) : null}
+        <section className="section glass-panel">
+          <div className="section-header">
+            <h2 className="section-title">Comments</h2>
+            <span className="pill">{comments.length}</span>
+          </div>
+          <form className="filter-stack" onSubmit={submitComment}>
+            <textarea
+              className="field"
+              value={commentText}
+              onChange={(event) => setCommentText(event.target.value)}
+              placeholder="Share a thought about this title..."
+              maxLength={500}
+              rows={3}
+            />
+            <div className="actions">
+              <button className="btn btn-primary" type="submit">
+                <Icon name="add" />
+                Post Comment
+              </button>
+            </div>
+          </form>
+          <div className="notice-list" style={{ marginTop: 18 }}>
+            {comments.map((comment) => (
+              <article className="comment-card" key={comment._id ?? comment.id}>
+                {comment.profileId?.avatarUrl ? (
+                  <Image className="comment-avatar" src={comment.profileId.avatarUrl} alt={profileName(comment.profileId)} width={48} height={48} />
+                ) : (
+                  <span className="comment-avatar-fallback">{profileName(comment.profileId).slice(0, 1).toUpperCase()}</span>
+                )}
+                <div className="comment-body">
+                  <div className="comment-meta">
+                    <h3 className="card-title">{profileName(comment.profileId)}</h3>
+                    <span className="muted">{formatDate(comment.createdAt)}</span>
+                  </div>
+                  <p className="muted">{comment.content}</p>
+                </div>
+              </article>
+            ))}
+            {comments.length === 0 ? <p className="muted">No comments yet.</p> : null}
+          </div>
+        </section>
       </main>
+      {showPlayer ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Movie player">
+          <section className="player-modal">
+            <div className="section-header">
+              <div>
+                <h2 className="section-title">{playerTitle}</h2>
+                <p className="muted">{playableSource?.quality ?? (trailerUrl && !selectedEpisode ? "Trailer available" : "Source pending")}</p>
+              </div>
+              <button className="icon-button" onClick={() => setShowPlayer(false)} type="button" aria-label="Close player">
+                <Icon name="close" />
+              </button>
+            </div>
+            {playableSource?.url ? (
+              <video className="movie-player" src={playableSource.url} controls autoPlay />
+            ) : (
+              <div className="player-empty">
+                <Icon name="live_tv" />
+                <strong>No playable stream available</strong>
+                <span className="muted">{selectedEpisode ? "This episode exists, but its stream source has not been published." : "This title is in the catalog, but its stream source has not been published."}</span>
+                {trailerUrl && !selectedEpisode ? (
+                  <a className="btn btn-ghost" href={trailerUrl} target="_blank" rel="noreferrer">
+                    Open Trailer
+                  </a>
+                ) : null}
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
       <MovieRail title="Similar Titles" movies={similar} />
     </div>
   );

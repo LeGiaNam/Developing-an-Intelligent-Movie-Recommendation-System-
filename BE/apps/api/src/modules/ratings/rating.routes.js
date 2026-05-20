@@ -6,6 +6,7 @@ import { Movie } from "../movies/movie.model.js";
 import { assertProfileOwnership } from "../../common/utils/assertProfileOwnership.js";
 import {
   invalidateProfileRecommendations,
+  invalidateSimilarRecommendations,
   invalidateTrendingRecommendations,
 } from "../../integrations/recommendation/recommendation.client.js";
 
@@ -30,6 +31,7 @@ export async function ratingRoutes(app) {
     });
     await Promise.all([
       invalidateProfileRecommendations(request.params.profileId),
+      invalidateSimilarRecommendations(request.params.movieId),
       invalidateTrendingRecommendations(),
     ]);
     return ok(rating);

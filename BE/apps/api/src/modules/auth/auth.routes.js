@@ -84,4 +84,20 @@ export async function authRoutes(app) {
     const profiles = await Profile.find({ userId: request.user.sub });
     return ok({ user, profiles });
   });
+
+  app.patch("/me/password", { preHandler: authenticate }, async (request) => {
+    const input = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: passwordSchema,
+    }).parse(request.body);
+
+    const user = await User.findById(request.user.sub);
+    if (!user?.passwordHash || !(await bcrypt.compare(input.currentPassword, user.passwordHash))) {
+      throw new AppError(401, "INVALID_CURRENT_PASSWORD", "Current password is incorrect");
+    }
+
+    user.passwordHash = await bcrypt.hash(input.newPassword, 12);
+    await user.save();
+    return ok({ updated: true });
+  });
 }
