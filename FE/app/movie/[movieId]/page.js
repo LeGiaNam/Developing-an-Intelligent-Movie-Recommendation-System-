@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
@@ -39,15 +39,42 @@ export default function MovieDetailsPage() {
   const [similarMovies, setSimilarMovies] = useState([]);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editCommentText, setEditCommentText] = useState("");
   const [ratingScore, setRatingScore] = useState(5);
   const [userRating, setUserRating] = useState(null);
   const [showPlayer, setShowPlayer] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   const [status, setStatus] = useState("");
+  const [activeProfileId, setActiveProfileId] = useState(null);
+  
+  const lastSyncTimeRef = useRef(0);
+
+  const handleTimeUpdate = (e) => {
+    const video = e.target;
+    const currentTime = video.currentTime;
+    const duration = video.duration;
+    
+    // Sync every 10 seconds or when video ends
+    if (currentTime - lastSyncTimeRef.current >= 10 || currentTime >= duration - 1) {
+      lastSyncTimeRef.current = currentTime;
+      if (activeProfileId) {
+        api.updateHistory(
+          activeProfileId, 
+          movieId, 
+          currentTime, 
+          duration, 
+          getToken(), 
+          selectedEpisode?._id
+        ).catch(() => {});
+      }
+    }
+  };
 
   useEffect(() => {
     if (!movieId) return;
     const cached = getCachedMovies();
+    setActiveProfileId(getActiveProfileId());
     queueMicrotask(() => {
       setCachedMovies(cached);
       setMovie(cached.find((item) => item.id === movieId) ?? null);
@@ -58,11 +85,22 @@ export default function MovieDetailsPage() {
       .then((item) => {
         if (!item) {
           setStatus("Movie not found in backend catalog.");
-          return;
         }
         setMovie(mapMovie(item));
       })
-      .catch(() => setStatus(cached.length ? "Backend unavailable. Showing cached movie data." : "Backend unavailable."));
+      .catch((error) => setStatus(error.message));
+
+    const token = getToken();
+    const activeProfileId = getActiveProfileId();
+    if (token && activeProfileId) {
+      api.getRatings(activeProfileId, token).then((ratings) => {
+        const rating = ratings.find((r) => r.movieId?._id === movieId || r.movieId === movieId);
+        if (rating) {
+          setRatingScore(rating.score);
+          setUserRating(rating);
+        }
+      }).catch(() => {});
+    }
 
     api
       .episodes(movieId)
@@ -173,6 +211,36 @@ export default function MovieDetailsPage() {
       setComments((current) => [created, ...current].slice(0, 10));
       setCommentText("");
       setStatus("Comment posted.");
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function handleUpdateComment(commentId) {
+    const token = getToken();
+    const profileId = getActiveProfileId();
+    const content = editCommentText.trim();
+    if (!token || !profileId || !content) return;
+    try {
+      const updated = await api.updateComment(commentId, profileId, content, token);
+      setComments((current) => current.map((c) => (c._id === commentId || c.id === commentId ? { ...c, content: updated.content } : c)));
+      setEditingCommentId(null);
+      setEditCommentText("");
+      setStatus("Comment updated.");
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function handleDeleteComment(commentId) {
+    const token = getToken();
+    const profileId = getActiveProfileId();
+    if (!token || !profileId) return;
+    if (!window.confirm("Delete this comment?")) return;
+    try {
+      await api.deleteComment(commentId, profileId, token);
+      setComments((current) => current.filter((c) => c._id !== commentId && c.id !== commentId));
+      setStatus("Comment deleted.");
     } catch (error) {
       setStatus(error.message);
     }
@@ -318,7 +386,28 @@ export default function MovieDetailsPage() {
                     <h3 className="card-title">{profileName(comment.profileId)}</h3>
                     <span className="muted">{formatDate(comment.createdAt)}</span>
                   </div>
-                  <p className="muted">{comment.content}</p>
+                  {editingCommentId === (comment._id ?? comment.id) ? (
+                    <div className="filter-stack" style={{ marginTop: 8 }}>
+                      <textarea
+                        className="field"
+                        value={editCommentText}
+                        onChange={(e) => setEditCommentText(e.target.value)}
+                        rows={2}
+                      />
+                      <div className="actions" style={{ marginTop: 8 }}>
+                        <button className="btn btn-primary" style={{ padding: "4px 12px", fontSize: 13 }} onClick={() => handleUpdateComment(comment._id ?? comment.id)}>Save</button>
+                        <button className="btn btn-ghost" style={{ padding: "4px 12px", fontSize: 13 }} onClick={() => setEditingCommentId(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="muted">{comment.content}</p>
+                  )}
+                  {activeProfileId === (comment.profileId?._id ?? comment.profileId?.id ?? comment.profileId) && editingCommentId !== (comment._id ?? comment.id) ? (
+                    <div className="actions" style={{ marginTop: 8 }}>
+                      <button className="link-button" onClick={() => { setEditingCommentId(comment._id ?? comment.id); setEditCommentText(comment.content); }}>Edit</button>
+                      <button className="link-button" onClick={() => handleDeleteComment(comment._id ?? comment.id)}>Delete</button>
+                    </div>
+                  ) : null}
                 </div>
               </article>
             ))}
@@ -339,7 +428,7 @@ export default function MovieDetailsPage() {
               </button>
             </div>
             {playableSource?.url ? (
-              <video className="movie-player" src={playableSource.url} controls autoPlay />
+              <video className="movie-player" src={playableSource.url} controls autoPlay onTimeUpdate={handleTimeUpdate} onEnded={handleTimeUpdate} />
             ) : (
               <div className="player-empty">
                 <Icon name="live_tv" />

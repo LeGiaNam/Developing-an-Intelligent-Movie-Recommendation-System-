@@ -13,6 +13,15 @@ import {
 export async function ratingRoutes(app) {
   app.addHook("preHandler", authenticate);
 
+  app.get("/:profileId/ratings", async (request) => {
+    await assertProfileOwnership(request.params.profileId, request.user.sub);
+    const ratings = await Rating.find({ profileId: request.params.profileId })
+      .populate("movieId")
+      .sort({ updatedAt: -1 })
+      .limit(20);
+    return ok(ratings);
+  });
+
   app.put("/:profileId/ratings/:movieId", async (request) => {
     await assertProfileOwnership(request.params.profileId, request.user.sub);
     const { score } = z.object({ score: z.number().int().min(1).max(5) }).parse(request.body);

@@ -137,16 +137,19 @@ def get_personalized_movies(profile_id: str) -> list[RecommendationItem]:
         set_cached_recommendations(cache_key, precomputed_items)
         return precomputed_items
 
-    if profile_id.isdigit():
+    recommender = get_recommender()
+    numeric_profile_id = recommender.resolve_numeric_profile_id(profile_id) if recommender else None
+
+    # Try ML model if we have a mapped ID and it exists in training data
+    if recommender and numeric_profile_id is not None and recommender.is_existing_user(numeric_profile_id):
         recommendations = get_model_recommendations(
-            user_id=int(profile_id),
+            user_id=numeric_profile_id,
             user_profile={"gender": "M", "occupation": "other", "tag": ""},
             top_k=10,
         )
         items = [_to_item(item.model_dump()) for item in recommendations]
-    elif get_recommender() is not None:
-        items = [_to_item(item.model_dump()) for item in get_model_popular(top_k=10)]
     else:
+        # Fallback to Mongo Live Content-Based engine for Cold Start / Unmapped profiles
         try:
             items = get_mongo_personalized(profile_id)
         except Exception:

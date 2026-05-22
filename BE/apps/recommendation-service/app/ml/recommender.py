@@ -133,6 +133,14 @@ class HybridMovieRecommender:
                 return int(numeric_id)
         return None
 
+    def resolve_numeric_profile_id(self, profile_id: str) -> Optional[int]:
+        if str(profile_id).isdigit():
+            return int(profile_id)
+        for numeric_id, mongo_id in self._id_map.get("profiles", {}).items():
+            if mongo_id == str(profile_id):
+                return int(numeric_id)
+        return None
+
     def movie_object_id(self, movie_id: int) -> Optional[str]:
         if self._movies_df is not None and "mongoMovieId" in self._movies_df.columns:
             matches = self._movies_df[self._movies_df["movieId"] == int(movie_id)]
@@ -214,6 +222,54 @@ class HybridMovieRecommender:
     # RECOMMEND
     # ------------------------------------------------------------------
 
+    def build_rf_features_batch(self, user_profile: Dict[str, str], movies_df: pd.DataFrame) -> np.ndarray:
+        """Tạo ma trận đặc trưng cho nhiều phim cùng lúc."""
+        le_gender = self._encoders["le_gender"]
+        le_occupation = self._encoders["le_occupation"]
+        mlb = self._encoders["mlb"]
+        tfidf = self._encoders["tfidf"]
+        feature_columns = self._encoders["feature_columns"]
+
+        gender = user_profile.get("gender", "M")
+        if gender not in le_gender.classes_:
+            gender = le_gender.classes_[0]
+        gender_enc = le_gender.transform([gender])[0]
+
+        occupation = user_profile.get("occupation", "other")
+        if occupation not in le_occupation.classes_:
+            occupation = le_occupation.classes_[0]
+        occ_enc = le_occupation.transform([occupation])[0]
+
+        tag = user_profile.get("tag", "")
+        tag_enc = tfidf.transform([tag]).toarray()[0]
+
+        known_genres = set(mlb.classes_)
+        def process_genres(genres_str):
+            if not isinstance(genres_str, str): return ["(no genres listed)"]
+            g_list = [g for g in genres_str.split("|") if g in known_genres]
+            return g_list if g_list else ["(no genres listed)"]
+            
+        genres_lists = movies_df["genres"].apply(process_genres).tolist()
+        genres_enc_matrix = mlb.transform(genres_lists)
+
+        n_movies = len(movies_df)
+        gender_occ_matrix = np.tile([gender_enc, occ_enc], (n_movies, 1))
+        tag_matrix = np.tile(tag_enc, (n_movies, 1))
+        
+        raw_matrix = np.hstack([gender_occ_matrix, genres_enc_matrix, tag_matrix])
+        
+        # Ensure column alignment matches training
+        # If feature_columns matches raw_matrix columns exactly, this is fast.
+        # Otherwise, we construct a DataFrame and align it.
+        if len(feature_columns) == raw_matrix.shape[1]:
+            return raw_matrix
+        
+        df = pd.DataFrame(raw_matrix, columns=feature_columns[:raw_matrix.shape[1]])
+        for col in feature_columns:
+            if col not in df.columns:
+                df[col] = 0.0
+        return df[feature_columns].values
+
     def recommend_for_user(
         self,
         user_id: int,
@@ -222,52 +278,48 @@ class HybridMovieRecommender:
         alpha: float = 0.7,
     ) -> List[Dict]:
         """
-        Gợi ý top_k phim cho user dùng mô hình Hybrid.
-
-        Args:
-            user_id: ID người dùng
-            user_profile: {"gender": "M", "occupation": "student", "tag": "action"}
-            top_k: Số phim trả về
-            alpha: Trọng số SVD (0.0 = thuần Content, 1.0 = thuần CF)
-
-        Returns:
-            List[dict] với keys: movieId, title, genres, svd_score, content_score, hybrid_score
+        Gợi ý top_k phim cho user dùng mô hình Hybrid bằng Vectorization.
         """
-        # Nếu user chưa tồn tại trong hệ thống → fallback sang popular
         if not self.is_existing_user(user_id):
             print(f"[Recommender] User {user_id} has no training data; fallback to popular")
             return self.recommend_popular(top_k=top_k)
 
-        # Lấy danh sách phim chưa xem
         watched_ids = self.get_watched_movie_ids(user_id)
         candidate_movies = self._movies_df[~self._movies_df["movieId"].isin(watched_ids)].copy()
 
         if candidate_movies.empty:
-            print(f"[Recommender] User {user_id} has watched all candidates; fallback to popular")
             return self.recommend_popular(top_k=top_k)
 
-        # Tính điểm cho từng phim
+        # 1. Batch predict SVD
+        # Surprise SVD est. prediction is not naturally vectorized, but list comprehension is fast enough.
+        svd_scores = np.array([self.predict_svd_score(user_id, int(m_id)) for m_id in candidate_movies["movieId"]])
+
+        # 2. Batch predict RF
+        features_matrix = self.build_rf_features_batch(user_profile, candidate_movies)
+        content_scores = self._rf.predict(features_matrix)
+
+        # 3. Hybrid scoring
+        hybrid_scores = alpha * svd_scores + (1 - alpha) * content_scores
+
+        candidate_movies["svd_score"] = svd_scores
+        candidate_movies["content_score"] = content_scores
+        candidate_movies["hybrid_score"] = hybrid_scores
+
+        # Sắp xếp và lấy top K
+        top_candidates = candidate_movies.nlargest(top_k, "hybrid_score")
+
         results = []
-        for _, movie_row in candidate_movies.iterrows():
-            movie_id = int(movie_row["movieId"])
-
-            svd_score = self.predict_svd_score(user_id, movie_id)
-            content_score = self.predict_content_score(user_profile, movie_row)
-            hybrid_score = alpha * svd_score + (1 - alpha) * content_score
-
+        for _, row in top_candidates.iterrows():
             results.append({
-                "movieId": movie_id,
-                "movieObjectId": self.movie_object_id(movie_id),
-                "title": str(movie_row.get("title", "")),
-                "genres": str(movie_row.get("genres", "")),
-                "svd_score": round(svd_score, 4),
-                "content_score": round(content_score, 4),
-                "hybrid_score": round(hybrid_score, 4),
+                "movieId": int(row["movieId"]),
+                "movieObjectId": self.movie_object_id(int(row["movieId"])),
+                "title": str(row.get("title", "")),
+                "genres": str(row.get("genres", "")),
+                "svd_score": round(float(row["svd_score"]), 4),
+                "content_score": round(float(row["content_score"]), 4),
+                "hybrid_score": round(float(row["hybrid_score"]), 4),
             })
-
-        # Sắp xếp theo hybrid_score giảm dần
-        results.sort(key=lambda x: x["hybrid_score"], reverse=True)
-        return results[:top_k]
+        return results
 
     def recommend_popular(self, top_k: int = 10) -> List[Dict]:
         """

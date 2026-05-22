@@ -37,4 +37,28 @@ export async function commentRoutes(app) {
     reply.code(201);
     return ok(replyComment);
   });
+
+  app.patch("/comments/:commentId", { preHandler: authenticate }, async (request) => {
+    const input = z.object({ profileId: z.string(), content: z.string().min(1).max(500) }).parse(request.body);
+    await assertProfileOwnership(input.profileId, request.user.sub);
+
+    const comment = await Comment.findOne({ _id: request.params.commentId, profileId: input.profileId, isDeleted: false });
+    if (!comment) throw new AppError(404, "NOT_FOUND", "Comment not found");
+
+    comment.content = input.content;
+    await comment.save();
+    return ok(comment);
+  });
+
+  app.delete("/comments/:commentId", { preHandler: authenticate }, async (request) => {
+    const input = z.object({ profileId: z.string() }).parse(request.body);
+    await assertProfileOwnership(input.profileId, request.user.sub);
+
+    const comment = await Comment.findOne({ _id: request.params.commentId, profileId: input.profileId, isDeleted: false });
+    if (!comment) throw new AppError(404, "NOT_FOUND", "Comment not found");
+
+    comment.isDeleted = true;
+    await comment.save();
+    return ok({ deleted: true });
+  });
 }

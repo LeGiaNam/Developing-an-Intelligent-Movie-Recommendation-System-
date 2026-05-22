@@ -166,6 +166,9 @@ export const api = {
   async removeFromWatchlist(profileId, movieId, token) {
     return request(`/profiles/${profileId}/watchlist/${movieId}`, { method: "DELETE", token });
   },
+  async getRatings(profileId, token) {
+    return request(`/profiles/${profileId}/ratings`, { token });
+  },
   async rateMovie(profileId, movieId, score, token) {
     return request(`/profiles/${profileId}/ratings/${movieId}`, { method: "PUT", body: { score }, token });
   },
@@ -184,6 +187,12 @@ export const api = {
   },
   async addComment(movieId, profileId, content, token) {
     return request(`/movies/${movieId}/comments`, { method: "POST", body: { profileId, content }, token });
+  },
+  async updateComment(commentId, profileId, content, token) {
+    return request(`/comments/${commentId}`, { method: "PATCH", body: { profileId, content }, token });
+  },
+  async deleteComment(commentId, profileId, token) {
+    return request(`/comments/${commentId}`, { method: "DELETE", body: { profileId }, token });
   },
   async replyComment(commentId, movieId, profileId, content, token) {
     return request(`/comments/${commentId}/replies`, { method: "POST", body: { movieId, profileId, content }, token });

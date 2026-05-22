@@ -12,6 +12,7 @@ export default function UserProfilePage() {
   const [profile, setProfile] = useState(null);
   const [user, setUser] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
+  const [ratedMovies, setRatedMovies] = useState([]);
   const [displayName, setDisplayName] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -33,6 +34,8 @@ export default function UserProfilePage() {
           setDisplayName(mappedProfile.name);
           const items = await api.watchlist(mappedProfile.id, token).catch(() => []);
           setWatchlist(items.map((item) => mapMovie(item.movieId ?? item)).filter(Boolean));
+          const ratings = await api.getRatings(mappedProfile.id, token).catch(() => []);
+          setRatedMovies(ratings.map((r) => mapMovie(r.movieId)).filter(Boolean));
         }
         setUser(data.user ?? { email: "" });
         setStatus("");
@@ -130,6 +133,9 @@ export default function UserProfilePage() {
           </aside>
         </div>
       </main>
+      {ratedMovies.length > 0 ? (
+        <MovieRail title="Your Ratings" movies={ratedMovies} />
+      ) : null}
       <MovieRail title="Your Watchlist" movies={watchlist} />
     </div>
   );

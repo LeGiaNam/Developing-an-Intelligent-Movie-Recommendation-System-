@@ -139,6 +139,13 @@ export default function AuthPage({ initialMode = "login" }) {
             <Icon name="login" />
             {loading ? "Connecting..." : isRegister ? "Create Account" : "Sign In"}
           </button>
+          <div className="section-header" style={{ justifyContent: "center", margin: "8px 0" }}>
+            <span className="muted" style={{ fontSize: 13 }}>OR</span>
+          </div>
+          <button className="btn btn-ghost" type="button" onClick={() => alert("Google OAuth flow is pending real Client ID setup. Please use Email/Password.")}>
+            <Icon name="add" />
+            Continue with Google
+          </button>
           <p className="muted auth-copy">
             {isRegister ? "Already have an account?" : "New to IPANMOVIE?"}{" "}
             <button className="link-button" type="button" onClick={() => switchMode(isRegister ? "login" : "register")}>
