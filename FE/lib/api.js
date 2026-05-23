@@ -197,6 +197,9 @@ export const api = {
   async replyComment(commentId, movieId, profileId, content, token) {
     return request(`/comments/${commentId}/replies`, { method: "POST", body: { movieId, profileId, content }, token });
   },
+  async commentAction(commentId, profileId, action, token) {
+    return request(`/comments/${commentId}/action`, { method: "POST", body: { profileId, action }, token });
+  },
   async createMovie(movie, token) {
     return request("/admin/movies", { method: "POST", body: movie, token });
   },

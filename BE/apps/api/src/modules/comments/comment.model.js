@@ -6,6 +6,9 @@ const commentSchema = new mongoose.Schema(
     movieId: { type: mongoose.Schema.Types.ObjectId, ref: "Movie", required: true },
     parentCommentId: { type: mongoose.Schema.Types.ObjectId, ref: "Comment" },
     content: { type: String, maxlength: 500, required: true },
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
+    dislikes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
+    reports: [{ type: mongoose.Schema.Types.ObjectId, ref: "Profile" }],
     isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }

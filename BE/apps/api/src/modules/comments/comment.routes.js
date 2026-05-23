@@ -61,4 +61,31 @@ export async function commentRoutes(app) {
     await comment.save();
     return ok({ deleted: true });
   });
+
+  app.post("/comments/:commentId/action", { preHandler: authenticate }, async (request) => {
+    const input = z.object({ profileId: z.string(), action: z.enum(["like", "dislike", "report"]) }).parse(request.body);
+    await assertProfileOwnership(input.profileId, request.user.sub);
+
+    const comment = await Comment.findOne({ _id: request.params.commentId, isDeleted: false });
+    if (!comment) throw new AppError(404, "NOT_FOUND", "Comment not found");
+
+    // Bỏ like/dislike cũ
+    comment.likes = comment.likes.filter((id) => id.toString() !== input.profileId);
+    comment.dislikes = comment.dislikes.filter((id) => id.toString() !== input.profileId);
+
+    if (input.action === "like") {
+      comment.likes.push(input.profileId);
+    } else if (input.action === "dislike") {
+      comment.dislikes.push(input.profileId);
+    } else if (input.action === "report") {
+      const alreadyReported = comment.reports.some((id) => id.toString() === input.profileId);
+      if (!alreadyReported) {
+        comment.reports.push(input.profileId);
+      }
+    }
+
+    await comment.save();
+    await comment.populate("profileId", "name avatarUrl isKids");
+    return ok(comment);
+  });
 }

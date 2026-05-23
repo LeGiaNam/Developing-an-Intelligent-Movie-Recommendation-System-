@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
 import { Icon } from "@/components/Icon";
+import { useToast } from "@/components/Toast";
 import { api, getCachedMovies, mapMovie } from "@/lib/api";
 import { getActiveProfileId, getToken } from "@/lib/auth";
 
@@ -33,6 +34,7 @@ function durationLabel(seconds) {
 
 export default function MovieDetailsPage() {
   const { movieId } = useParams();
+  const { toast } = useToast();
   const [cachedMovies, setCachedMovies] = useState([]);
   const [movie, setMovie] = useState(null);
   const [episodes, setEpisodes] = useState([]);
@@ -43,9 +45,9 @@ export default function MovieDetailsPage() {
   const [editCommentText, setEditCommentText] = useState("");
   const [ratingScore, setRatingScore] = useState(5);
   const [userRating, setUserRating] = useState(null);
+  const [inWatchlist, setInWatchlist] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
-  const [status, setStatus] = useState("");
   const [activeProfileId, setActiveProfileId] = useState(null);
   
   const lastSyncTimeRef = useRef(0);
@@ -74,7 +76,8 @@ export default function MovieDetailsPage() {
   useEffect(() => {
     if (!movieId) return;
     const cached = getCachedMovies();
-    setActiveProfileId(getActiveProfileId());
+    const profId = getActiveProfileId();
+    setActiveProfileId(profId);
     queueMicrotask(() => {
       setCachedMovies(cached);
       setMovie(cached.find((item) => item.id === movieId) ?? null);
@@ -82,40 +85,28 @@ export default function MovieDetailsPage() {
 
     api
       .movie(movieId)
-      .then((item) => {
-        if (!item) {
-          setStatus("Movie not found in backend catalog.");
-        }
-        setMovie(mapMovie(item));
-      })
-      .catch((error) => setStatus(error.message));
+      .then((item) => { if (item) setMovie(mapMovie(item)); })
+      .catch((error) => toast(error.message, "error"));
 
     const token = getToken();
-    const activeProfileId = getActiveProfileId();
-    if (token && activeProfileId) {
-      api.getRatings(activeProfileId, token).then((ratings) => {
+    if (token && profId) {
+      api.getRatings(profId, token).then((ratings) => {
         const rating = ratings.find((r) => r.movieId?._id === movieId || r.movieId === movieId);
-        if (rating) {
-          setRatingScore(rating.score);
-          setUserRating(rating);
-        }
+        if (rating) { setRatingScore(rating.score); setUserRating(rating); }
+      }).catch(() => {});
+
+      // Check if already in watchlist
+      api.watchlist(profId, token).then((items) => {
+        const found = items.some((item) =>
+          (item.movieId?._id ?? item.movieId ?? item._id ?? item.id) === movieId
+        );
+        setInWatchlist(found);
       }).catch(() => {});
     }
 
-    api
-      .episodes(movieId)
-      .then(setEpisodes)
-      .catch(() => setEpisodes([]));
-
-    api
-      .similar(movieId)
-      .then((items) => setSimilarMovies(items.map(mapMovie).filter(Boolean)))
-      .catch(() => setSimilarMovies([]));
-
-    api
-      .comments(movieId)
-      .then(setComments)
-      .catch(() => setComments([]));
+    api.episodes(movieId).then(setEpisodes).catch(() => setEpisodes([]));
+    api.similar(movieId).then((items) => setSimilarMovies(items.map(mapMovie).filter(Boolean))).catch(() => setSimilarMovies([]));
+    api.comments(movieId).then(setComments).catch(() => setComments([]));
   }, [movieId]);
 
   const similar = similarMovies.length ? similarMovies : cachedMovies.filter((item) => item.id !== movie?.id).slice(0, 10);
@@ -136,25 +127,31 @@ export default function MovieDetailsPage() {
     const token = getToken();
     const profileId = getActiveProfileId();
     if (!token || !profileId) {
-      setStatus("Sign in and choose a profile first.");
+      toast("Sign in and choose a profile first.", "warn");
       return;
     }
     if (!movie?.id) {
-      setStatus("Movie is still loading.");
+      toast("Movie is still loading.", "warn");
       return;
     }
-
     try {
       await action(profileId, movie.id, token);
     } catch (error) {
-      setStatus(error.message);
+      toast(error.message, "error");
     }
   }
 
-  function addToMyList() {
+  function toggleWatchlist() {
     runProfileAction(async (profileId, movieIdValue, token) => {
-      await api.addToWatchlist(profileId, movieIdValue, token);
-      setStatus("Added to your list.");
+      if (inWatchlist) {
+        await api.removeFromWatchlist(profileId, movieIdValue, token);
+        setInWatchlist(false);
+        toast("Removed from your list.", "info");
+      } else {
+        await api.addToWatchlist(profileId, movieIdValue, token);
+        setInWatchlist(true);
+        toast("Added to your list!", "success");
+      }
     });
   }
 
@@ -167,7 +164,7 @@ export default function MovieDetailsPage() {
         rating: ratingScore.toFixed(1),
         raw: { ...current.raw, averageRating: ratingScore },
       } : current);
-      setStatus(`Rated ${ratingScore} stars.`);
+      toast(`Rated ${ratingScore} stars! Thank you.`, "success");
     });
   }
 
@@ -179,17 +176,15 @@ export default function MovieDetailsPage() {
     const profileId = getActiveProfileId();
     if (!token || !profileId || !movie?.id) {
       if (isSeries && !targetEpisode) {
-        setStatus("This series does not have episodes yet.");
+        toast("This series does not have episodes yet.", "warn");
       }
       return;
     }
-
     try {
       const durationSeconds = targetEpisode?.durationSeconds ?? movie?.raw?.durationSeconds ?? 3600;
       await api.updateHistory(profileId, movie.id, 60, durationSeconds, token, targetEpisode?._id ?? null);
-      setStatus(targetEpisode ? `Playback started: ${targetEpisode.title ?? "Episode"}.` : hasPlaybackSource ? "Playback started." : "Added to your watch history.");
-    } catch (error) {
-      setStatus(error.message);
+    } catch {
+      // silent
     }
   }
 
@@ -199,20 +194,17 @@ export default function MovieDetailsPage() {
     const profileId = getActiveProfileId();
     const content = commentText.trim();
     if (!token || !profileId) {
-      setStatus("Sign in and choose a profile before commenting.");
+      toast("Sign in and choose a profile before commenting.", "warn");
       return;
     }
-    if (!content || !movie?.id) {
-      return;
-    }
-
+    if (!content || !movie?.id) return;
     try {
       const created = await api.addComment(movie.id, profileId, content, token);
       setComments((current) => [created, ...current].slice(0, 10));
       setCommentText("");
-      setStatus("Comment posted.");
+      toast("Comment posted!", "success");
     } catch (error) {
-      setStatus(error.message);
+      toast(error.message, "error");
     }
   }
 
@@ -226,9 +218,9 @@ export default function MovieDetailsPage() {
       setComments((current) => current.map((c) => (c._id === commentId || c.id === commentId ? { ...c, content: updated.content } : c)));
       setEditingCommentId(null);
       setEditCommentText("");
-      setStatus("Comment updated.");
+      toast("Comment updated.", "success");
     } catch (error) {
-      setStatus(error.message);
+      toast(error.message, "error");
     }
   }
 
@@ -240,9 +232,25 @@ export default function MovieDetailsPage() {
     try {
       await api.deleteComment(commentId, profileId, token);
       setComments((current) => current.filter((c) => c._id !== commentId && c.id !== commentId));
-      setStatus("Comment deleted.");
+      toast("Comment deleted.", "success");
     } catch (error) {
-      setStatus(error.message);
+      toast(error.message, "error");
+    }
+  }
+
+  async function handleCommentAction(commentId, action) {
+    const token = getToken();
+    const profileId = getActiveProfileId();
+    if (!token || !profileId) {
+      toast(`Sign in to ${action} this comment.`, "warn");
+      return;
+    }
+    try {
+      const updated = await api.commentAction(commentId, profileId, action, token);
+      setComments((current) => current.map((c) => (c._id === commentId || c.id === commentId ? updated : c)));
+      if (action === "report") toast("Comment reported. Our team will review it.", "success");
+    } catch (error) {
+      toast(error.message, "error");
     }
   }
 
@@ -263,9 +271,13 @@ export default function MovieDetailsPage() {
               <Icon name="play_arrow" filled />
               {isSeries ? "Play Episode 1" : "Play"}
             </button>
-            <button className="btn btn-ghost" onClick={addToMyList} type="button">
-              <Icon name="add" />
-              My List
+            <button
+              className={`btn btn-ghost${inWatchlist ? " btn-watchlist-active" : ""}`}
+              onClick={toggleWatchlist}
+              type="button"
+            >
+              <Icon name={inWatchlist ? "bookmark" : "bookmark_add"} />
+              {inWatchlist ? "In My List" : "Add to My List"}
             </button>
             <div className="rating-control" aria-label="Rate movie">
               {[1, 2, 3, 4, 5].map((score) => (
@@ -281,12 +293,11 @@ export default function MovieDetailsPage() {
               ))}
               <span className="rating-value">{ratingScore}/5</span>
               <button className="btn btn-ghost" onClick={rateMovie} type="button">
-                <Icon name="thumb_up" />
+                <Icon name={userRating ? "star" : "thumb_up"} />
                 {userRating ? "Rated" : "Rate"}
               </button>
             </div>
           </div>
-          {status ? <p className="muted">{status}</p> : null}
         </div>
       </section>
       <main className="container">
@@ -407,7 +418,32 @@ export default function MovieDetailsPage() {
                       <button className="link-button" onClick={() => { setEditingCommentId(comment._id ?? comment.id); setEditCommentText(comment.content); }}>Edit</button>
                       <button className="link-button" onClick={() => handleDeleteComment(comment._id ?? comment.id)}>Delete</button>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="actions" style={{ marginTop: 8, gap: 16 }}>
+                      <button
+                        className="link-button"
+                        style={{ display: "flex", alignItems: "center", gap: 4, color: comment.likes?.includes(activeProfileId) ? "var(--primary)" : "var(--muted)" }}
+                        onClick={() => handleCommentAction(comment._id ?? comment.id, "like")}
+                      >
+                        <Icon name="thumb_up" style={{ width: 14, height: 14 }} /> {comment.likes?.length || 0}
+                      </button>
+                      <button
+                        className="link-button"
+                        style={{ display: "flex", alignItems: "center", gap: 4, color: comment.dislikes?.includes(activeProfileId) ? "var(--secondary)" : "var(--muted)" }}
+                        onClick={() => handleCommentAction(comment._id ?? comment.id, "dislike")}
+                      >
+                        <Icon name="thumb_down" style={{ width: 14, height: 14 }} /> {comment.dislikes?.length || 0}
+                      </button>
+                      <button
+                        className="link-button"
+                        style={{ display: "flex", alignItems: "center", gap: 4, color: comment.reports?.includes(activeProfileId) ? "#ff8080" : "var(--muted)" }}
+                        onClick={() => handleCommentAction(comment._id ?? comment.id, "report")}
+                        title="Report this comment"
+                      >
+                        <Icon name="flag" style={{ width: 14, height: 14 }} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
             ))}

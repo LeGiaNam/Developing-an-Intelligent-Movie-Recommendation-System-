@@ -9,7 +9,7 @@ import { getToken } from "@/lib/auth";
 const adminLinks = [
   { href: "/admin", label: "Movie Manager", icon: "movie" },
   { href: "/admin/users", label: "User Management", icon: "group" },
-  { href: "/admin/users/new", label: "Add New User", icon: "person_add" },
+  { href: "/admin/recommendations", label: "Recommendation Engine", icon: "recommend" },
   { href: "/", label: "Viewer App", icon: "live_tv" },
 ];
 

@@ -5,138 +5,265 @@ import Image from "next/image";
 import { MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
 import { Icon } from "@/components/Icon";
+import { SkeletonRail } from "@/components/EmptyState";
+import { useToast } from "@/components/Toast";
 import { api, mapMovie, mapProfile } from "@/lib/api";
 import { getActiveProfileId, getToken } from "@/lib/auth";
 
 export default function UserProfilePage() {
+  const { toast } = useToast();
   const [profile, setProfile] = useState(null);
   const [user, setUser] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
   const [ratedMovies, setRatedMovies] = useState([]);
+  const [watchHistory, setWatchHistory] = useState([]);
   const [displayName, setDisplayName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
-  const [status, setStatus] = useState("Sign in to load backend profile data.");
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("info"); // "info" | "history" | "ratings"
 
   useEffect(() => {
     const token = getToken();
     const activeProfileId = getActiveProfileId();
-    if (!token) return;
+    if (!token) { setLoading(false); return; }
 
-    api
-      .me(token)
+    api.me(token)
       .then(async (data) => {
         const selected = data.profiles?.find((item) => item._id === activeProfileId) ?? data.profiles?.[0];
         if (selected) {
-          const mappedProfile = mapProfile(selected);
-          setProfile(mappedProfile);
-          setDisplayName(mappedProfile.name);
-          const items = await api.watchlist(mappedProfile.id, token).catch(() => []);
-          setWatchlist(items.map((item) => mapMovie(item.movieId ?? item)).filter(Boolean));
-          const ratings = await api.getRatings(mappedProfile.id, token).catch(() => []);
-          setRatedMovies(ratings.map((r) => mapMovie(r.movieId)).filter(Boolean));
+          const mapped = mapProfile(selected);
+          setProfile(mapped);
+          setDisplayName(mapped.name);
+          setAvatarUrl(mapped.image || "");
+
+          const [wl, ratings, history] = await Promise.allSettled([
+            api.watchlist(mapped.id, token),
+            api.getRatings(mapped.id, token),
+            api.history(mapped.id, token),
+          ]);
+
+          if (wl.status === "fulfilled") {
+            setWatchlist(wl.value.map((item) => mapMovie(item.movieId ?? item)).filter(Boolean));
+          }
+          if (ratings.status === "fulfilled") {
+            setRatedMovies(ratings.value.map((r) => mapMovie(r.movieId)).filter(Boolean));
+          }
+          if (history.status === "fulfilled") {
+            setWatchHistory(
+              history.value
+                .map((h) => {
+                  const movie = mapMovie(h.movieId ?? h);
+                  if (!movie) return null;
+                  const pct = h.durationSeconds > 0
+                    ? Math.round((h.progressSeconds / h.durationSeconds) * 100)
+                    : 0;
+                  return { ...movie, progress: Math.min(pct, 100) };
+                })
+                .filter(Boolean)
+                .slice(0, 20)
+            );
+          }
         }
         setUser(data.user ?? { email: "" });
-        setStatus("");
       })
-      .catch((error) => setStatus(error.message));
+      .catch((err) => toast(err.message, "error"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function saveChanges() {
     const token = getToken();
     if (!token || !profile?.id) {
-      setStatus("Sign in and choose a profile first.");
+      toast("Sign in and choose a profile first.", "warn");
       return;
     }
-
     setSavingProfile(true);
-    setStatus("");
     try {
-      if (displayName.trim() && displayName.trim() !== profile.name) {
-        const updated = await api.updateProfile(profile.id, { name: displayName.trim() }, token);
+      const patch = {};
+      if (displayName.trim() && displayName.trim() !== profile.name) patch.name = displayName.trim();
+      if (avatarUrl.trim() !== (profile.image || "")) patch.avatarUrl = avatarUrl.trim() || null;
+
+      if (Object.keys(patch).length > 0) {
+        const updated = await api.updateProfile(profile.id, patch, token);
         const mapped = mapProfile(updated);
         setProfile(mapped);
         setDisplayName(mapped.name);
+        setAvatarUrl(mapped.image || "");
       }
-      if (currentPassword || newPassword) {
+
+      if (currentPassword && newPassword) {
         await api.changePassword(currentPassword, newPassword, token);
         setCurrentPassword("");
         setNewPassword("");
       }
-      setStatus("Changes saved.");
+      toast("Changes saved successfully.", "success");
     } catch (error) {
-      setStatus(error.message);
+      toast(error.message, "error");
     } finally {
       setSavingProfile(false);
     }
   }
 
+  const avatarSrc = avatarUrl || profile?.image || null;
+  const initials = (profile?.name ?? "U").charAt(0).toUpperCase();
+
   return (
     <div className="app-shell profile-page">
       <NavBar />
+
+      {/* Hero */}
       <section className="profile-hero">
         <div className="container">
-          {profile?.image ? <Image className="avatar" src={profile.image} alt={profile.name} width={92} height={92} style={{ width: 92, height: 92 }} /> : null}
+          {avatarSrc ? (
+            <Image className="avatar" src={avatarSrc} alt={profile?.name ?? "Profile"} width={92} height={92}
+              style={{ width: 92, height: 92, marginBottom: 12 }} />
+          ) : (
+            <div style={{
+              width: 92, height: 92, borderRadius: "999px",
+              display: "grid", placeItems: "center",
+              background: "rgba(255,181,154,0.14)", color: "var(--primary)",
+              fontFamily: "Montserrat,sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 12,
+            }}>{initials}</div>
+          )}
           <h1 className="title-xl" style={{ fontSize: "clamp(38px, 5vw, 64px)" }}>
             {profile?.name ?? "Profile"}
           </h1>
-          <p className="muted">{status || `Signed in as ${user?.email ?? "IPANMOVIE user"}`}</p>
+          <p className="muted">{user?.email ? `Signed in as ${user.email}` : "Loading..."}</p>
         </div>
       </section>
+
+      {/* Tabs */}
       <main className="container section">
-        <div className="feature-grid">
-          <section className="glass-panel filter-stack">
-            <h2 className="section-title">Personal Information</h2>
-            <div className="form-grid">
-              <label className="field-label">
-                Display name
-                <input className="field" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
-              </label>
-              <label className="field-label">
-                Email
-                <input className="field" value={user?.email ?? ""} readOnly />
-              </label>
-            </div>
-            <h2 className="section-title">Change Password</h2>
-            <div className="form-grid">
-              <input className="field" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} placeholder="Current password" type="password" />
-              <input className="field" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="New password" type="password" />
-            </div>
-            <div className="actions">
-              <button className="btn btn-ghost" type="button" onClick={() => {
-                setDisplayName(profile?.name ?? "");
-                setCurrentPassword("");
-                setNewPassword("");
-              }}>Cancel</button>
-              <button className="btn btn-primary" disabled={savingProfile} onClick={saveChanges} type="button">
-                {savingProfile ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </section>
-          <aside className="glass-panel filter-stack">
-            <h2 className="section-title">Watch Preferences</h2>
-            {["Autoplay trailers", "Kids content hidden", "Vietnamese subtitles", "Email recommendations"].map((item) => (
-              <label className="section-header" key={item}>
-                <span>{item}</span>
-                <input type="checkbox" defaultChecked />
-              </label>
-            ))}
-            <div className="chips">
-              {["Privacy Policy", "Terms of Service", "Cookie Preferences", "Help Center"].map((item) => (
-                <span className="pill" key={item}>
-                  <Icon name="chevron_right" />
-                  {item}
-                </span>
-              ))}
-            </div>
-          </aside>
+        <div className="admin-tabs">
+          {[
+            { id: "info", label: "Personal Info", icon: "person" },
+            { id: "history", label: `Continue Watching${watchHistory.length ? ` (${watchHistory.length})` : ""}`, icon: "history" },
+            { id: "ratings", label: `Your Ratings${ratedMovies.length ? ` (${ratedMovies.length})` : ""}`, icon: "star" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              className={`admin-tab${activeTab === tab.id ? " active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+              type="button"
+            >
+              <Icon name={tab.icon} style={{ width: 16, height: 16 }} />
+              {" "}{tab.label}
+            </button>
+          ))}
         </div>
+
+        {/* Personal Info Tab */}
+        {activeTab === "info" && (
+          <div className="feature-grid">
+            <section className="glass-panel filter-stack">
+              <h2 className="section-title">Personal Information</h2>
+              <div className="form-grid">
+                <label className="field-label">
+                  Display Name
+                  <input className="field" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                </label>
+                <label className="field-label">
+                  Email
+                  <input className="field" value={user?.email ?? ""} readOnly style={{ opacity: 0.6 }} />
+                </label>
+                <label className="field-label" style={{ gridColumn: "1 / -1" }}>
+                  Avatar URL
+                  <input
+                    className="field"
+                    value={avatarUrl}
+                    onChange={(e) => setAvatarUrl(e.target.value)}
+                    placeholder="https://example.com/avatar.jpg"
+                    type="url"
+                  />
+                  {avatarUrl && (
+                    <img
+                      src={avatarUrl}
+                      alt="Avatar preview"
+                      className="img-preview"
+                      style={{ width: 80, height: 80, borderRadius: "999px", aspectRatio: "1", objectFit: "cover" }}
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
+                  )}
+                </label>
+              </div>
+
+              <h2 className="section-title" style={{ marginTop: 8 }}>Change Password</h2>
+              <div className="form-grid">
+                <input className="field" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Current password" type="password" autoComplete="current-password" />
+                <input className="field" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="New password" type="password" autoComplete="new-password" />
+              </div>
+
+              <div className="actions">
+                <button className="btn btn-ghost" type="button" onClick={() => {
+                  setDisplayName(profile?.name ?? "");
+                  setAvatarUrl(profile?.image || "");
+                  setCurrentPassword("");
+                  setNewPassword("");
+                }}>Cancel</button>
+                <button className="btn btn-primary" disabled={savingProfile} onClick={saveChanges} type="button">
+                  {savingProfile ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </section>
+
+            <aside className="glass-panel filter-stack">
+              <h2 className="section-title">Quick Stats</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[
+                  { label: "Watchlist", value: watchlist.length, icon: "bookmark" },
+                  { label: "Rated", value: ratedMovies.length, icon: "star" },
+                  { label: "Watched", value: watchHistory.length, icon: "history" },
+                  { label: "Completed", value: watchHistory.filter((h) => h.progress >= 90).length, icon: "check_circle" },
+                ].map(({ label, value, icon }) => (
+                  <div key={label} className="kpi" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <Icon name={icon} style={{ color: "var(--primary)" }} />
+                    <div>
+                      <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "Montserrat,sans-serif" }}>{value}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>{label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <h2 className="section-title" style={{ marginTop: 8 }}>Links</h2>
+              <div className="chips">
+                {[
+                  { label: "Privacy Policy", href: "#" },
+                  { label: "Terms of Service", href: "#" },
+                  { label: "Help Center", href: "#" },
+                  { label: "Cookie Settings", href: "#" },
+                ].map(({ label, href }) => (
+                  <a key={label} className="pill" href={href} style={{ textDecoration: "none" }}>
+                    <Icon name="chevron_right" />
+                    {label}
+                  </a>
+                ))}
+              </div>
+            </aside>
+          </div>
+        )}
       </main>
-      {ratedMovies.length > 0 ? (
-        <MovieRail title="Your Ratings" movies={ratedMovies} />
-      ) : null}
-      <MovieRail title="Your Watchlist" movies={watchlist} />
+
+      {/* Continue Watching Tab */}
+      {activeTab === "history" && (
+        loading ? <SkeletonRail count={5} wide /> : (
+          <MovieRail title="Continue Watching" movies={watchHistory} wide />
+        )
+      )}
+
+      {/* Ratings Tab */}
+      {activeTab === "ratings" && (
+        loading ? <SkeletonRail count={5} /> : (
+          <MovieRail title="Your Ratings" movies={ratedMovies} />
+        )
+      )}
+
+      {/* Watchlist always visible at bottom */}
+      {loading ? <SkeletonRail count={5} /> : <MovieRail title="Your Watchlist" movies={watchlist} />}
     </div>
   );
 }

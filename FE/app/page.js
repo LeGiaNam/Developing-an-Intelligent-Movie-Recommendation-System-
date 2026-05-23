@@ -13,6 +13,7 @@ export default function HomePage() {
   const [catalog, setCatalog] = useState([]);
   const [trending, setTrending] = useState([]);
   const [recommended, setRecommended] = useState([]);
+  const [watchHistory, setWatchHistory] = useState([]);
   const [recommendationPopupOpen, setRecommendationPopupOpen] = useState(false);
   const [recommendationPopupStatus, setRecommendationPopupStatus] = useState("");
   const [status, setStatus] = useState("Loading catalog...");
@@ -46,6 +47,25 @@ export default function HomePage() {
       api
         .personalized(profileId, token)
         .then((items) => setRecommended(items.map(mapMovie).filter(Boolean)))
+        .catch(() => {});
+
+      // Load watch history for "Continue Watching"
+      api
+        .history(profileId, token)
+        .then((items) => {
+          const mapped = items
+            .map((h) => {
+              const movie = mapMovie(h.movieId ?? h);
+              if (!movie) return null;
+              const pct = h.durationSeconds > 0
+                ? Math.round((h.progressSeconds / h.durationSeconds) * 100)
+                : 0;
+              return { ...movie, progress: Math.min(pct, 100) };
+            })
+            .filter(Boolean)
+            .slice(0, 10);
+          setWatchHistory(mapped);
+        })
         .catch(() => {});
     }
   }, []);
@@ -106,23 +126,35 @@ export default function HomePage() {
           <h1 className="title-xl">{heroMovie?.title ?? "IPANMOVIE"}</h1>
           <p className="lead">{heroMovie?.description ?? "Connect the backend to load the live movie catalog."}</p>
           <div className="actions">
-            <button className="btn btn-primary">
-              <Icon name="play_arrow" filled />
-              Play
-            </button>
-            <button className="btn btn-ghost">
-              <Icon name="add" />
-              My List
-            </button>
-            <button className="btn btn-ghost" onClick={openRecommendationPopup} type="button">
-              <Icon name="auto_awesome" filled />
-              For You
-            </button>
-          </div>
-          {status ? <p className="muted">{status}</p> : null}
+              {heroMovie ? (
+                <Link className="btn btn-primary" href={`/movie/${heroMovie.id}`}>
+                  <Icon name="play_arrow" filled />
+                  Play Now
+                </Link>
+              ) : (
+                <Link className="btn btn-primary" href="/browse">
+                  <Icon name="search" />
+                  Browse
+                </Link>
+              )}
+              {heroMovie ? (
+                <Link className="btn btn-ghost" href={`/movie/${heroMovie.id}`}>
+                  <Icon name="info" />
+                  More Info
+                </Link>
+              ) : null}
+              <button className="btn btn-ghost" onClick={openRecommendationPopup} type="button">
+                <Icon name="auto_awesome" filled />
+                For You
+              </button>
+            </div>
+            {status ? <p className="muted">{status}</p> : null}
         </div>
       </section>
-      <MovieRail title="Continue Watching" movies={catalog.slice(0, 6)} wide />
+      {/* Continue Watching — real watch history data */}
+      {watchHistory.length > 0 && (
+        <MovieRail title="Continue Watching" movies={watchHistory} wide />
+      )}
       {featureMovie ? <section className="section container">
         <div className="section-header">
           <h2 className="section-title">Trending Now</h2>

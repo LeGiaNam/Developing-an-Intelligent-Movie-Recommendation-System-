@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
+import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { images } from "@/lib/data";
 import { saveActiveProfileId, saveToken } from "@/lib/auth";
@@ -21,12 +22,12 @@ function firstProfileId(data) {
 
 export default function AuthPage({ initialMode = "login" }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState(initialMode === "register" ? "" : "user@ipanmovie.local");
   const [password, setPassword] = useState(initialMode === "register" ? "" : "Password@123");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [profileName, setProfileName] = useState("Main Profile");
-  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
   const isRegister = mode === "register";
@@ -39,7 +40,6 @@ export default function AuthPage({ initialMode = "login" }) {
 
   function switchMode(nextMode) {
     setMode(nextMode);
-    setStatus("");
     setConfirmPassword("");
     if (nextMode === "register") {
       setEmail("");
@@ -53,15 +53,16 @@ export default function AuthPage({ initialMode = "login" }) {
   async function handleSubmit(event) {
     event.preventDefault();
     setLoading(true);
-    setStatus("");
     try {
       if (isRegister) {
         if (password !== confirmPassword) {
-          setStatus("Passwords do not match.");
+          toast("Passwords do not match.", "warn");
+          setLoading(false);
           return;
         }
         if (passwordChecks.some(([, passed]) => !passed)) {
-          setStatus("Password does not meet the requirements.");
+          toast("Password does not meet the requirements.", "warn");
+          setLoading(false);
           return;
         }
 
@@ -78,8 +79,9 @@ export default function AuthPage({ initialMode = "login" }) {
       const profileId = firstProfileId(data);
       if (profileId) saveActiveProfileId(profileId);
       router.push("/profiles");
+      toast(`Welcome back!`, "success");
     } catch (error) {
-      setStatus(getErrorMessage(error));
+      toast(getErrorMessage(error), "error");
     } finally {
       setLoading(false);
     }
@@ -134,7 +136,6 @@ export default function AuthPage({ initialMode = "login" }) {
               <input type="checkbox" /> Remember me
             </label>
           </div> : null}
-          {status ? <p className="muted">{status}</p> : null}
           <button className="btn btn-primary" disabled={loading} type="submit">
             <Icon name="login" />
             {loading ? "Connecting..." : isRegister ? "Create Account" : "Sign In"}
