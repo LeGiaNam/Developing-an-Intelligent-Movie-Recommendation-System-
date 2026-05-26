@@ -12,7 +12,7 @@ import { getActiveProfileId, getToken } from "@/lib/auth";
 
 const GENRES = ["Action", "Sci-Fi", "Drama", "Fantasy", "Thriller", "Comedy", "Horror", "Romance"];
 
-export default function MoviesPage() {
+export default function SeriesPage() {
   const router = useRouter();
   const [movies, setMovies] = useState([]);
   const [recommended, setRecommended] = useState([]);
@@ -23,10 +23,10 @@ export default function MoviesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    const cached = getCachedMovies("movie");
+    const cached = getCachedMovies("series");
     if (cached.length) { setMovies(cached); setLoading(false); }
 
-    loadMovies("movie", 1)
+    loadMovies("series", 1)
       .then((items) => {
         setMovies(items);
         setHasMore(items.length === 24);
@@ -62,7 +62,7 @@ export default function MoviesPage() {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     const nextPage = page + 1;
-    loadMovies("movie", nextPage)
+    loadMovies("series", nextPage)
       .then((items) => {
         setMovies((prev) => [...prev, ...items]);
         setPage(nextPage);
@@ -74,7 +74,7 @@ export default function MoviesPage() {
 
   return (
     <div className="app-shell">
-      <NavBar active="/movies" />
+      <NavBar active="/series" />
 
       {/* Hero Section */}
       {loading ? (
@@ -92,13 +92,13 @@ export default function MoviesPage() {
         >
           <div className="hero-content">
             <div className="eyebrow">
-              <span>Featured Movie</span>
+              <span>Featured TV Series</span>
               {featured && <span className="pill">{featured.genre}</span>}
               {featured && <span className="muted">⭐ {featured.rating}</span>}
             </div>
-            <h1 className="title-xl">{featured?.title ?? "Movies"}</h1>
+            <h1 className="title-xl">{featured?.title ?? "TV Series"}</h1>
             <p className="lead">
-              {featured?.description ?? "Explore our full catalog of movies and series."}
+              {featured?.description ?? "Explore our full catalog of TV series and episodes."}
             </p>
             <div className="actions">
               {featured ? (
@@ -136,7 +136,7 @@ export default function MoviesPage() {
       <section className="section container">
         <div className="section-header">
           <h2 className="section-title">
-            All Movies
+            All TV Series
             {activeGenre && <span style={{ color: "var(--primary)", fontSize: "0.6em", marginLeft: 12 }}>— {activeGenre}</span>}
           </h2>
           {activeGenre && (
@@ -174,7 +174,7 @@ export default function MoviesPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon="movie_filter"
-            title={`No ${activeGenre ?? ""} movies found`}
+            title={`No ${activeGenre ?? ""} TV series found`}
             description="Try a different genre or browse the full catalog."
             action="Clear filter"
             onAction={() => setActiveGenre(null)}

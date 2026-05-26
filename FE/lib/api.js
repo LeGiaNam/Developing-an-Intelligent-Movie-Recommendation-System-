@@ -75,17 +75,23 @@ function writeCache(key, items) {
   window.localStorage.setItem(key, JSON.stringify(items));
 }
 
-export function getCachedMovies() {
-  return readCache(MOVIES_CACHE_KEY, mapMovie);
+export function getCachedMovies(type) {
+  const cacheKey = type ? `${MOVIES_CACHE_KEY}_${type}` : MOVIES_CACHE_KEY;
+  return readCache(cacheKey, mapMovie);
 }
 
 export function getCachedProfiles() {
   return readCache(PROFILE_CACHE_KEY, mapProfile);
 }
 
-export async function loadMovies() {
-  const items = await api.movies();
-  writeCache(MOVIES_CACHE_KEY, items);
+export function saveCachedProfiles(profilesRaw) {
+  writeCache(PROFILE_CACHE_KEY, profilesRaw);
+}
+
+export async function loadMovies(type, page = 1) {
+  const items = await api.movies(type, page);
+  const cacheKey = type ? `${MOVIES_CACHE_KEY}_${type}` : MOVIES_CACHE_KEY;
+  if (page === 1) writeCache(cacheKey, items);
   return items.map(mapMovie).filter(Boolean);
 }
 
@@ -123,8 +129,10 @@ export const api = {
   async verifyProfilePin(profileId, pin, token) {
     return request(`/profiles/${profileId}/verify-pin`, { method: "POST", body: { pin }, token });
   },
-  async movies() {
-    return request("/movies");
+  async movies(type, page = 1) {
+    const search = new URLSearchParams({ page, limit: 24 });
+    if (type) search.set("type", type);
+    return request(`/movies?${search.toString()}`);
   },
   async movie(movieId) {
     return request(`/movies/${movieId}`);

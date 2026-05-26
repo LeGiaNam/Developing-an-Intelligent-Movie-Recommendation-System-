@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 import { api } from "@/lib/api";
@@ -47,7 +48,8 @@ export function AdminShell({ active = "/admin", children }) {
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <Link className="brand" href="/admin">
+        <Link className="brand" href="/admin" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Image src="/logo.png" alt="IPANMOVIE Logo" width={32} height={32} style={{ borderRadius: "50%" }} />
           IPANMOVIE
         </Link>
         <nav className="admin-menu">

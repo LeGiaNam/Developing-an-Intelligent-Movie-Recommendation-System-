@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
@@ -24,11 +25,13 @@ export default function AuthPage({ initialMode = "login" }) {
   const router = useRouter();
   const { toast } = useToast();
   const [mode, setMode] = useState(initialMode);
-  const [email, setEmail] = useState(initialMode === "register" ? "" : "user@ipanmovie.local");
-  const [password, setPassword] = useState(initialMode === "register" ? "" : "Password@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [profileName, setProfileName] = useState("Main Profile");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const isRegister = mode === "register";
   const passwordChecks = [
@@ -40,14 +43,11 @@ export default function AuthPage({ initialMode = "login" }) {
 
   function switchMode(nextMode) {
     setMode(nextMode);
+    setEmail("");
+    setPassword("");
     setConfirmPassword("");
-    if (nextMode === "register") {
-      setEmail("");
-      setPassword("");
-      return;
-    }
-    setEmail("user@ipanmovie.local");
-    setPassword("Password@123");
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   }
 
   async function handleSubmit(event) {
@@ -90,7 +90,8 @@ export default function AuthPage({ initialMode = "login" }) {
   return (
     <main className="auth-page" style={{ backgroundImage: `linear-gradient(90deg, rgba(14,14,15,.92), rgba(14,14,15,.34)), url(${images.auth})` }}>
       <section className="auth-card">
-        <Link className="brand" href="/">
+        <Link className="brand" href="/" style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "center" }}>
+          <Image src="/logo.png" alt="IPANMOVIE Logo" width={40} height={40} style={{ borderRadius: "50%" }} />
           IPANMOVIE
         </Link>
         <div className="section-header" style={{ marginTop: 30 }}>
@@ -109,13 +110,23 @@ export default function AuthPage({ initialMode = "login" }) {
           </label>
           <label className="field-label">
             Password
-            <input className="field" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password@123" type="password" autoComplete={isRegister ? "new-password" : "current-password"} required />
+            <div className="password-input-container">
+              <input className="field" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password@123" type={showPassword ? "text" : "password"} autoComplete={isRegister ? "new-password" : "current-password"} required />
+              <button className="password-toggle-btn" type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                <Icon name={showPassword ? "eye_off" : "eye"} />
+              </button>
+            </div>
           </label>
           {isRegister ? (
             <>
               <label className="field-label">
                 Confirm password
-                <input className="field" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Repeat password" type="password" autoComplete="new-password" required />
+                <div className="password-input-container">
+                  <input className="field" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Repeat password" type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" required />
+                  <button className="password-toggle-btn" type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+                    <Icon name={showConfirmPassword ? "eye_off" : "eye"} />
+                  </button>
+                </div>
               </label>
               <label className="field-label">
                 Profile name
@@ -139,13 +150,6 @@ export default function AuthPage({ initialMode = "login" }) {
           <button className="btn btn-primary" disabled={loading} type="submit">
             <Icon name="login" />
             {loading ? "Connecting..." : isRegister ? "Create Account" : "Sign In"}
-          </button>
-          <div className="section-header" style={{ justifyContent: "center", margin: "8px 0" }}>
-            <span className="muted" style={{ fontSize: 13 }}>OR</span>
-          </div>
-          <button className="btn btn-ghost" type="button" onClick={() => alert("Google OAuth flow is pending real Client ID setup. Please use Email/Password.")}>
-            <Icon name="add" />
-            Continue with Google
           </button>
           <p className="muted auth-copy">
             {isRegister ? "Already have an account?" : "New to IPANMOVIE?"}{" "}

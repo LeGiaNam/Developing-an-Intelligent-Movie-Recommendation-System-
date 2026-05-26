@@ -11,8 +11,12 @@ export async function movieRoutes(app) {
 
   app.get("/", async (request) => {
     const page = Math.max(Number(request.query.page ?? 1), 1);
-    const limit = Math.min(Math.max(Number(request.query.limit ?? 24), 1), 50);
-    const movies = await Movie.find({ isDeleted: false })
+    const limit = Math.min(Math.max(Number(request.query.limit ?? 24), 1), 100);
+    const filter = { isDeleted: false };
+    if (request.query.type) {
+      filter.type = request.query.type;
+    }
+    const movies = await Movie.find(filter)
       .skip((page - 1) * limit)
       .limit(limit);
     return ok(movies);

@@ -2,17 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Icon } from "@/components/Icon";
 import { MovieRail } from "@/components/MovieCard";
 import { NavBar } from "@/components/NavBar";
-import { Icon } from "@/components/Icon";
 import { SkeletonRail } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
-import { api, mapMovie, mapProfile } from "@/lib/api";
-import { getActiveProfileId, getToken } from "@/lib/auth";
+import { api, mapMovie, mapProfile, saveCachedProfiles } from "@/lib/api";
+import { getActiveProfileId, getToken, saveActiveProfileId } from "@/lib/auth";
 
 export default function UserProfilePage() {
+  const router = useRouter();
   const { toast } = useToast();
   const [profile, setProfile] = useState(null);
+  const [profiles, setProfiles] = useState([]);
   const [user, setUser] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
   const [ratedMovies, setRatedMovies] = useState([]);
@@ -24,6 +28,7 @@ export default function UserProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("info"); // "info" | "history" | "ratings"
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -32,7 +37,8 @@ export default function UserProfilePage() {
 
     api.me(token)
       .then(async (data) => {
-        const selected = data.profiles?.find((item) => item._id === activeProfileId) ?? data.profiles?.[0];
+        setProfiles(data.profiles ?? []);
+        const selected = data.profiles?.find((p) => p._id === activeProfileId) ?? data.profiles?.[0];
         if (selected) {
           const mapped = mapProfile(selected);
           setProfile(mapped);
@@ -88,6 +94,13 @@ export default function UserProfilePage() {
       if (Object.keys(patch).length > 0) {
         const updated = await api.updateProfile(profile.id, patch, token);
         const mapped = mapProfile(updated);
+
+        const updatedRaw = profiles.map((p) =>
+          (p._id ?? p.id) === profile.id ? updated : p
+        );
+        setProfiles(updatedRaw);
+        saveCachedProfiles(updatedRaw);
+
         setProfile(mapped);
         setDisplayName(mapped.name);
         setAvatarUrl(mapped.image || "");
@@ -106,19 +119,61 @@ export default function UserProfilePage() {
     }
   }
 
+  async function handleDeleteProfile() {
+    const token = getToken();
+    if (!token || !profile?.id) return;
+
+    try {
+      await api.deleteProfile(profile.id, token);
+      toast("Profile deleted successfully.", "success");
+
+      const remaining = profiles.filter((p) => (p._id ?? p.id) !== profile.id);
+      saveCachedProfiles(remaining);
+      saveActiveProfileId(remaining.length > 0 ? (remaining[0]._id ?? remaining[0].id) : null);
+
+      router.push("/profiles");
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  }
+
+  function cancelChanges() {
+    setDisplayName(profile?.name ?? "");
+    setAvatarUrl(profile?.image || "");
+    setCurrentPassword("");
+    setNewPassword("");
+  }
+
   const avatarSrc = avatarUrl || profile?.image || null;
   const initials = (profile?.name ?? "U").charAt(0).toUpperCase();
+  const canDelete = profiles.length > 1;
 
   return (
     <div className="app-shell profile-page">
       <NavBar />
 
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Profile"
+        message={`"${profile?.name}" and all its watch history, ratings, and watchlist will be permanently deleted.`}
+        confirmLabel="Delete Profile"
+        onConfirm={() => { setShowDeleteConfirm(false); handleDeleteProfile(); }}
+        onCancel={() => setShowDeleteConfirm(false)}
+        danger
+      />
+
       {/* Hero */}
       <section className="profile-hero">
         <div className="container">
           {avatarSrc ? (
-            <Image className="avatar" src={avatarSrc} alt={profile?.name ?? "Profile"} width={92} height={92}
-              style={{ width: 92, height: 92, marginBottom: 12 }} />
+            <Image
+              className="avatar"
+              src={avatarSrc}
+              alt={profile?.name ?? "Profile"}
+              width={92}
+              height={92}
+              style={{ width: 92, height: 92, marginBottom: 12 }}
+            />
           ) : (
             <div style={{
               width: 92, height: 92, borderRadius: "999px",
@@ -148,7 +203,7 @@ export default function UserProfilePage() {
               onClick={() => setActiveTab(tab.id)}
               type="button"
             >
-              <Icon name={tab.icon} style={{ width: 16, height: 16 }} />
+              <Icon name={tab.icon} />
               {" "}{tab.label}
             </button>
           ))}
@@ -162,7 +217,7 @@ export default function UserProfilePage() {
               <div className="form-grid">
                 <label className="field-label">
                   Display Name
-                  <input className="field" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                  <input className="field" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={40} />
                 </label>
                 <label className="field-label">
                   Email
@@ -181,8 +236,7 @@ export default function UserProfilePage() {
                     <img
                       src={avatarUrl}
                       alt="Avatar preview"
-                      className="img-preview"
-                      style={{ width: 80, height: 80, borderRadius: "999px", aspectRatio: "1", objectFit: "cover" }}
+                      style={{ width: 80, height: 80, borderRadius: "999px", objectFit: "cover", marginTop: 8 }}
                       onError={(e) => { e.target.style.display = "none"; }}
                     />
                   )}
@@ -191,22 +245,40 @@ export default function UserProfilePage() {
 
               <h2 className="section-title" style={{ marginTop: 8 }}>Change Password</h2>
               <div className="form-grid">
-                <input className="field" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Current password" type="password" autoComplete="current-password" />
-                <input className="field" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="New password" type="password" autoComplete="new-password" />
+                <input
+                  className="field"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Current password"
+                  type="password"
+                  autoComplete="current-password"
+                />
+                <input
+                  className="field"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="New password"
+                  type="password"
+                  autoComplete="new-password"
+                />
               </div>
 
               <div className="actions">
-                <button className="btn btn-ghost" type="button" onClick={() => {
-                  setDisplayName(profile?.name ?? "");
-                  setAvatarUrl(profile?.image || "");
-                  setCurrentPassword("");
-                  setNewPassword("");
-                }}>Cancel</button>
+                <button className="btn btn-ghost" type="button" onClick={cancelChanges}>Cancel</button>
                 <button className="btn btn-primary" disabled={savingProfile} onClick={saveChanges} type="button">
                   {savingProfile ? "Saving..." : "Save Changes"}
                 </button>
+                {canDelete && (
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    type="button"
+                    style={{ marginLeft: "auto" }}
+                  >
+                    <Icon name="delete" />
+                    Delete Profile
+                  </button>
+                )}
               </div>
             </section>
 
@@ -220,7 +292,7 @@ export default function UserProfilePage() {
                   { label: "Completed", value: watchHistory.filter((h) => h.progress >= 90).length, icon: "check_circle" },
                 ].map(({ label, value, icon }) => (
                   <div key={label} className="kpi" style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <Icon name={icon} style={{ color: "var(--primary)" }} />
+                    <Icon name={icon} />
                     <div>
                       <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "Montserrat,sans-serif" }}>{value}</div>
                       <div className="muted" style={{ fontSize: 12 }}>{label}</div>

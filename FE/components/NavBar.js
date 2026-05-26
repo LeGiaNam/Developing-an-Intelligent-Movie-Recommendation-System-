@@ -12,6 +12,7 @@ import { clearToken, getActiveProfileId, getToken } from "@/lib/auth";
 const links = [
   { href: "/", label: "Home", icon: "home" },
   { href: "/movies", label: "Movies", icon: "movie" },
+  { href: "/series", label: "TV Series", icon: "live_tv" },
   { href: "/browse", label: "Browse", icon: "search" },
   { href: "/notifications", label: "Notifications", icon: "notifications" },
 ];
@@ -153,7 +154,10 @@ export function NavBar({ active = "/" }) {
     <>
       <nav className="top-nav">
         <div className="nav-left">
-          <Link className="brand" href="/">IPANMOVIE</Link>
+          <Link className="brand" href="/" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Image src="/logo.png" alt="IPANMOVIE Logo" width={32} height={32} style={{ borderRadius: "50%" }} />
+            IPANMOVIE
+          </Link>
           <div className="nav-links">
             {links.map((link) => (
               <Link

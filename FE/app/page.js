@@ -185,7 +185,7 @@ export default function HomePage() {
           </div>
         </div>
       </section> : null}
-      <MovieRail title="Because You Watched Sci-Fi" movies={recommended} />
+      <MovieRail title="Top Picks For You" movies={recommended} />
       {recommendationPopupOpen ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Recommendation results">
           <div className="recommendation-modal">
